@@ -12,6 +12,8 @@ export type BoxScore = {
   fouls: number;
   penaltyAwarded: boolean;
   manOfTheMatch: string;
+  firstToScore: "home" | "away";
+  firstSubOff: string;
   report: string[];
 };
 
@@ -24,10 +26,13 @@ export const TRAINING_BOX_SCORES: Record<string, BoxScore> = {
     fouls: 22,
     penaltyAwarded: true,
     manOfTheMatch: "Messi",
+    firstToScore: "home",
+    firstSubOff: "Nicolás Otamendi",
     report: [
       "Argentina start like they mean business — pressing high, snapping into every second ball, and Brazil can't find a foothold in the opening exchanges.",
       "34' — GOAL. Di María drives at pace, Brazil's line drops off half a yard too late, and Julián Álvarez slides the finish under Alisson. Bedlam in the away end.",
       "Brazil respond after the break. Vinícius Jr. gets in behind, clips the heel of Tagliafico in the box, and the referee points straight to the spot — Neymar sends Martínez the wrong way, 58', 1–1.",
+      "63' — the first change of the night. Otamendi, still shaken from a knock in the build-up to the equalizer, is withdrawn for fresher legs at the back.",
       "The game turns feral in the final quarter. Four bookings in twenty minutes, niggling fouls everywhere, neither side willing to blink.",
       "76' — Messi. Of course it's Messi. A one-two on the edge of the box, half a yard of space, and the finish feels inevitable before it even happens. Argentina 2–1.",
       "Final whistle: a spiteful, brilliant occasion. Argentina survive a Brazilian onslaught in the last ten minutes, and Messi walks off with the match ball in his pocket.",

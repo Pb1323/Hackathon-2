@@ -8,6 +8,8 @@ export type TrainingPrediction = {
   fouls: number;
   penaltyAwarded: boolean;
   manOfTheMatch: string;
+  firstToScore: "home" | "away";
+  firstSubOff: string;
 };
 
 export type ScoreLine = {
@@ -88,6 +90,18 @@ export function scoreTrainingPrediction(
     label: "Man of the Match",
     correct: pred.manOfTheMatch === box.manOfTheMatch,
     points: pred.manOfTheMatch === box.manOfTheMatch ? 20 : 0,
+  });
+
+  lines.push({
+    label: "First to score",
+    correct: pred.firstToScore === box.firstToScore,
+    points: pred.firstToScore === box.firstToScore ? 10 : 0,
+  });
+
+  lines.push({
+    label: "First substitution",
+    correct: pred.firstSubOff === box.firstSubOff,
+    points: pred.firstSubOff === box.firstSubOff ? 15 : 0,
   });
 
   const total = lines.reduce((sum, l) => sum + l.points, 0);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import Tilt from "react-parallax-tilt";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import type { Keypair } from "@solana/web3.js";
@@ -17,8 +18,10 @@ import {
   type TrainingPrediction,
   type TrainingResult,
 } from "@/lib/trainingScoring";
+import { getCommunityPredictions } from "@/lib/communityPredictions";
 import { PitchDiagram } from "./PitchDiagram";
 import { ImmersiveBackground } from "./ImmersiveBackground";
+import { CommunityScorecard } from "./CommunityScorecard";
 
 type Step = "briefing" | "predict" | "review" | "revealed";
 
@@ -30,7 +33,46 @@ const DEFAULT_PREDICTION: TrainingPrediction = {
   fouls: 18,
   penaltyAwarded: false,
   manOfTheMatch: "",
+  firstToScore: "home",
+  firstSubOff: "",
 };
+
+// Depth wrapper for the "look at me" surfaces — real 3D mouse-tilt via
+// react-parallax-tilt (github.com/mkosir/react-parallax-tilt, MIT), skipped
+// entirely under prefers-reduced-motion rather than just disabling the tilt.
+function DepthCard({
+  children,
+  reduceMotion,
+  className,
+}: {
+  children: React.ReactNode;
+  reduceMotion: boolean;
+  className?: string;
+}) {
+  if (reduceMotion) return <div className={className}>{children}</div>;
+  return (
+    <Tilt
+      tiltMaxAngleX={6}
+      tiltMaxAngleY={6}
+      perspective={1200}
+      scale={1.01}
+      transitionSpeed={1200}
+      glareEnable
+      glareMaxOpacity={0.12}
+      glareColor="#ffffff"
+      glarePosition="all"
+      className={className}
+    >
+      {children}
+    </Tilt>
+  );
+}
+
+function triggerHaptic() {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(18);
+  }
+}
 
 function makeSimulatedSignature(): string {
   return `simulated-${Date.now().toString(36)}`;
@@ -78,6 +120,7 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
 
   async function handleLockIn() {
     if (!effectiveKey) return;
+    triggerHaptic();
     setLocking(true);
     setNotice(null);
     try {
@@ -120,6 +163,7 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
   }
 
   const titleWords = `${match.homeTeam} vs ${match.awayTeam}`.split(" ");
+  const community = getCommunityPredictions(match.id);
 
   return (
     <div className="relative min-h-screen">
@@ -164,12 +208,19 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
           >
             {step === "briefing" && (
               <section className="flex flex-col gap-6">
-                <PitchDiagram
-                  homeTeam={match.homeTeam}
-                  awayTeam={match.awayTeam}
-                  homeLoadout={match.homeLoadout ?? []}
-                  awayLoadout={match.awayLoadout ?? []}
-                />
+                <DepthCard reduceMotion={!!reduceMotion} className="rounded-xl">
+                  <div
+                    className="rounded-xl border p-4"
+                    style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+                  >
+                    <PitchDiagram
+                      homeTeam={match.homeTeam}
+                      awayTeam={match.awayTeam}
+                      homeLoadout={match.homeLoadout ?? []}
+                      awayLoadout={match.awayLoadout ?? []}
+                    />
+                  </div>
+                </DepthCard>
                 <div
                   className="rounded-xl border p-6"
                   style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
@@ -186,6 +237,7 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
                     ))}
                   </div>
                 </div>
+                {community && <CommunityScorecard data={community} />}
                 <motion.button
                   whileHover={reduceMotion ? undefined : { scale: 1.03 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -232,6 +284,10 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
                   <ReviewLine label="Total fouls">{prediction.fouls}</ReviewLine>
                   <ReviewLine label="Penalty awarded">{prediction.penaltyAwarded ? "Yes" : "No"}</ReviewLine>
                   <ReviewLine label="Man of the Match">{prediction.manOfTheMatch}</ReviewLine>
+                  <ReviewLine label="First to score">
+                    {prediction.firstToScore === "home" ? match.homeTeam : match.awayTeam}
+                  </ReviewLine>
+                  <ReviewLine label="First substitution">{prediction.firstSubOff}</ReviewLine>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -282,32 +338,34 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
 
             {step === "revealed" && result && (
               <section className="flex flex-col gap-6">
-                <div
-                  className="rounded-xl border p-6"
-                  style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
-                >
-                  <p
-                    className="mb-2 text-xs font-semibold uppercase tracking-widest"
-                    style={{ color: "var(--chalk-dim)" }}
+                <DepthCard reduceMotion={!!reduceMotion} className="rounded-xl">
+                  <div
+                    className="rounded-xl border p-6"
+                    style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
                   >
-                    Full-time report
-                  </p>
-                  <p className="scoreboard mb-4 text-2xl font-bold" style={{ color: "var(--chalk)" }}>
-                    {match.homeTeam} {box.homeScore} – {box.awayScore} {match.awayTeam}
-                  </p>
-                  <div className="flex max-w-[68ch] flex-col gap-3 text-[15px] leading-relaxed" style={{ color: "var(--chalk-dim)" }}>
-                    {box.report.map((line, i) => (
-                      <motion.p
-                        key={line}
-                        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-                        animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: i * 0.12 }}
-                      >
-                        {line}
-                      </motion.p>
-                    ))}
+                    <p
+                      className="mb-2 text-xs font-semibold uppercase tracking-widest"
+                      style={{ color: "var(--chalk-dim)" }}
+                    >
+                      Full-time report
+                    </p>
+                    <p className="scoreboard mb-4 text-2xl font-bold" style={{ color: "var(--chalk)" }}>
+                      {match.homeTeam} {box.homeScore} – {box.awayScore} {match.awayTeam}
+                    </p>
+                    <div className="flex max-w-[68ch] flex-col gap-3 text-[15px] leading-relaxed" style={{ color: "var(--chalk-dim)" }}>
+                      {box.report.map((line, i) => (
+                        <motion.p
+                          key={line}
+                          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: i * 0.12 }}
+                        >
+                          {line}
+                        </motion.p>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </DepthCard>
 
                 <div
                   className="rounded-xl border p-6"
@@ -407,7 +465,7 @@ function PredictionSheetForm({
   onSubmit: () => void;
   reduceMotion: boolean;
 }) {
-  const canSubmit = value.manOfTheMatch !== "";
+  const canSubmit = value.manOfTheMatch !== "" && value.firstSubOff !== "";
 
   return (
     <section
@@ -478,6 +536,44 @@ function PredictionSheetForm({
         <select
           value={value.manOfTheMatch}
           onChange={(e) => onChange({ ...value, manOfTheMatch: e.target.value })}
+          className="rounded-md border px-3 py-2.5 text-sm"
+          style={{ background: "var(--night-3)", borderColor: "var(--line)", color: "var(--chalk)" }}
+        >
+          <option value="" disabled>
+            Choose a player…
+          </option>
+          <optgroup label={match.homeTeam}>
+            {(match.homeLoadout ?? []).map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label={match.awayTeam}>
+            {(match.awayLoadout ?? []).map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      </Field>
+
+      <Field label="Who scores first?">
+        <ChoiceRow
+          options={[
+            { value: "home", label: match.homeTeam },
+            { value: "away", label: match.awayTeam },
+          ]}
+          selected={value.firstToScore}
+          onSelect={(v) => onChange({ ...value, firstToScore: v as TrainingPrediction["firstToScore"] })}
+        />
+      </Field>
+
+      <Field label="First player substituted off">
+        <select
+          value={value.firstSubOff}
+          onChange={(e) => onChange({ ...value, firstSubOff: e.target.value })}
           className="rounded-md border px-3 py-2.5 text-sm"
           style={{ background: "var(--night-3)", borderColor: "var(--line)", color: "var(--chalk)" }}
         >
