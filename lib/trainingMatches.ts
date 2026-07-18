@@ -18,6 +18,11 @@ export const TRAINING_MATCHES: Match[] = [
     odds: { home: 2.3, draw: 3.2, away: 2.7 },
     homeLoadout: ["Messi", "Di María", "Julián Álvarez"],
     awayLoadout: ["Neymar", "Vinícius Jr.", "Casemiro"],
+    preview: [
+      "Argentina go into this one full of confidence after a strong qualifying run, with Messi pulling the strings just off the front line.",
+      "Brazil counter with real pace out wide — Vinícius Jr. has been the form player of the tournament and will look to isolate Argentina's right side.",
+      "Both sides report a clean bill of health in training, though this fixture has history — expect a tightly-fought, niggly contest.",
+    ],
   },
   {
     id: "training-fra-eng",

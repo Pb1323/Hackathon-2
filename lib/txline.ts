@@ -21,6 +21,8 @@ export type Match = {
   // a real squad list from TxLINE.
   homeLoadout?: string[];
   awayLoadout?: string[];
+  // Pre-match preview copy — must never leak the result.
+  preview?: string[];
 };
 
 import { TRAINING_MATCHES } from "./trainingMatches";

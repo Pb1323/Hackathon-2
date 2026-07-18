@@ -23,8 +23,8 @@ export type PredictionPayload = {
   predictedAt: string; // ISO timestamp, client-side, informational only
 };
 
-export function buildMemoInstruction(
-  payload: PredictionPayload,
+export function buildMemoInstruction<T>(
+  payload: T,
   signer: PublicKey
 ): TransactionInstruction {
   return new TransactionInstruction({
@@ -34,10 +34,10 @@ export function buildMemoInstruction(
   });
 }
 
-export async function submitPrediction(
+export async function submitPrediction<T>(
   connection: Connection,
   wallet: WalletContextState,
-  payload: PredictionPayload
+  payload: T
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.sendTransaction) {
     throw new Error("Wallet not connected");
@@ -62,10 +62,10 @@ export async function submitPrediction(
 
 // Same anchoring, but signed by a local disposable keypair instead of a
 // wallet extension — used by the guest/no-install testing flow.
-export async function submitPredictionWithKeypair(
+export async function submitPredictionWithKeypair<T>(
   connection: Connection,
   payer: Keypair,
-  payload: PredictionPayload
+  payload: T
 ): Promise<string> {
   const instruction = buildMemoInstruction(payload, payer.publicKey);
   const transaction = new Transaction().add(instruction);

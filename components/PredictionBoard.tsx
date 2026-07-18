@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -7,6 +8,7 @@ import type { Keypair } from "@solana/web3.js";
 
 import type { Match } from "@/lib/txline";
 import { impliedWinPct } from "@/lib/trainingMatches";
+import { TRAINING_BOX_SCORES } from "@/lib/trainingBoxScores";
 import {
   ensureFunded,
   submitPrediction,
@@ -207,20 +209,55 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
           title="Training mode — settle instantly"
           note="Simulated form guide and results, for practicing calls any time"
         >
-          {finished.map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              walletKey={effectiveKey}
-              pending={pending === match.id}
-              alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
-              simulated={caps.find((c) => c.matchId === match.id)?.simulated ?? false}
-              onPredict={(pick) => handlePredict(match, pick)}
-            />
-          ))}
+          {finished.map((match) =>
+            TRAINING_BOX_SCORES[match.id] ? (
+              <TrainingModeCard key={match.id} match={match} />
+            ) : (
+              <MatchCard
+                key={match.id}
+                match={match}
+                walletKey={effectiveKey}
+                pending={pending === match.id}
+                alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
+                simulated={caps.find((c) => c.matchId === match.id)?.simulated ?? false}
+                onPredict={(pick) => handlePredict(match, pick)}
+              />
+            )
+          )}
         </Section>
       )}
     </div>
+  );
+}
+
+function TrainingModeCard({ match }: { match: Match }) {
+  const winPct = impliedWinPct(match);
+  return (
+    <Link
+      href={`/training/${match.id}`}
+      className="block rounded-lg border p-4 transition-colors hover:border-[var(--floodlight)]"
+      style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+    >
+      <p className="text-xs uppercase tracking-widest" style={{ color: "var(--chalk-dim)" }}>
+        {match.competition}
+      </p>
+      <p className="text-lg font-medium" style={{ color: "var(--chalk)" }}>
+        {match.homeTeam} vs {match.awayTeam}
+      </p>
+      {match.homeLoadout && match.awayLoadout && (
+        <p className="mt-1 text-xs" style={{ color: "var(--chalk-faint)" }}>
+          {match.homeLoadout.join(", ")} · {match.awayLoadout.join(", ")}
+        </p>
+      )}
+      {winPct && (
+        <p className="scoreboard mt-2 text-xs" style={{ color: "var(--chalk-faint)" }}>
+          Win% — {match.homeTeam} {winPct.home}% · Draw {winPct.draw}% · {match.awayTeam} {winPct.away}%
+        </p>
+      )}
+      <p className="mt-3 text-sm font-semibold" style={{ color: "var(--floodlight)" }}>
+        Open full training mode →
+      </p>
+    </Link>
   );
 }
 
