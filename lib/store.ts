@@ -9,6 +9,10 @@ export type Cap = {
   correct: boolean;
   points: number;
   signature: string;
+  // True when no devnet SOL was available to actually broadcast this — the
+  // pick is recorded locally so testing isn't blocked, but it was never
+  // anchored on-chain. `signature` is a local placeholder id, not a real one.
+  simulated?: boolean;
 };
 
 const KEY = "kickoff-calls:caps";

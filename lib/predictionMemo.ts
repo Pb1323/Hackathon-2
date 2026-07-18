@@ -93,10 +93,17 @@ export async function ensureFunded(
   const balance = await connection.getBalance(publicKey);
   if (balance >= minLamports) return;
 
-  const signature = await connection.requestAirdrop(publicKey, LAMPORTS_PER_SOL);
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  await connection.confirmTransaction(
-    { signature, blockhash, lastValidBlockHeight },
-    "confirmed"
-  );
+  // The public devnet faucet is IP-rate-limited and easily exhausted when a
+  // whole venue shares one IP, so route through our own pre-funded relay
+  // instead of calling connection.requestAirdrop directly.
+  const res = await fetch("/api/fund", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ publicKey: publicKey.toBase58() }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Funding relay failed (${res.status})`);
+  }
 }

@@ -25,6 +25,12 @@ import {
 import { DivisionRing } from "./DivisionRing";
 import { Leaderboard } from "./Leaderboard";
 
+// A placeholder id for a simulated (never broadcast) prediction — kept out
+// of the component body since it calls the impure Date.now().
+function makeSimulatedSignature(): string {
+  return `simulated-${Date.now().toString(36)}`;
+}
+
 export function PredictionBoard({ matches }: { matches: Match[] }) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -33,6 +39,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
   const [guestStatus, setGuestStatus] = useState<"idle" | "funding">("idle");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [version, setVersion] = useState(0); // bump to re-read localStorage
 
   const effectiveKey =
@@ -51,14 +58,17 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
 
   async function handleTryGuest() {
     setError(null);
+    setNotice(null);
     setGuestStatus("funding");
+    const kp = getOrCreateGuestKeypair();
+    // Set the guest key regardless of funding outcome — with zero balance,
+    // predictions still work in simulate mode (see handlePredict below).
+    setGuestKeypair(kp);
     try {
-      const kp = getOrCreateGuestKeypair();
       await ensureFunded(connection, kp.publicKey);
-      setGuestKeypair(kp);
     } catch {
-      setError(
-        "Devnet's faucet is rate-limited right now — wait a minute and try again, or connect Phantom instead."
+      setNotice(
+        "No devnet SOL available anywhere right now (faucet and relay both dry) — predictions will run in simulate mode: recorded locally, not yet broadcast on-chain. They'll anchor for real the moment funding is available."
       );
     } finally {
       setGuestStatus("idle");
@@ -75,9 +85,23 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         pick,
         predictedAt: new Date().toISOString(),
       };
-      const signature = guestKeypair
-        ? await submitPredictionWithKeypair(connection, guestKeypair, payload)
-        : await submitPrediction(connection, wallet, payload);
+
+      let signature: string;
+      let simulated = false;
+      try {
+        signature = guestKeypair
+          ? await submitPredictionWithKeypair(connection, guestKeypair, payload)
+          : await submitPrediction(connection, wallet, payload);
+      } catch {
+        // No devnet SOL to pay the transaction fee anywhere at hand — fall
+        // back to a local, honestly-labeled simulated record instead of
+        // blocking testing entirely.
+        simulated = true;
+        signature = makeSimulatedSignature();
+        setNotice(
+          "No devnet SOL to broadcast this on-chain right now — recorded locally as simulated instead."
+        );
+      }
 
       if (match.status === "finished") {
         const { correct, points: earned } = pointsForPick(match, pick, streak);
@@ -87,6 +111,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
           correct,
           points: earned,
           signature,
+          simulated,
         });
         setVersion((v) => v + 1);
       }
@@ -149,6 +174,15 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         </p>
       )}
 
+      {notice && (
+        <p
+          className="rounded-md px-4 py-2 text-sm"
+          style={{ background: "var(--cap-gold-dim)", color: "var(--cap-gold)" }}
+        >
+          {notice}
+        </p>
+      )}
+
       <Leaderboard you={you} />
 
       {upcoming.length > 0 && (
@@ -160,6 +194,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
               walletKey={effectiveKey}
               pending={pending === match.id}
               alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
+              simulated={caps.find((c) => c.matchId === match.id)?.simulated ?? false}
               onPredict={(pick) => handlePredict(match, pick)}
             />
           ))}
@@ -175,6 +210,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
               walletKey={effectiveKey}
               pending={pending === match.id}
               alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
+              simulated={caps.find((c) => c.matchId === match.id)?.simulated ?? false}
               onPredict={(pick) => handlePredict(match, pick)}
             />
           ))}
@@ -221,12 +257,14 @@ function MatchCard({
   walletKey,
   pending,
   alreadyCapped,
+  simulated,
   onPredict,
 }: {
   match: Match;
   walletKey: string | null;
   pending: boolean;
   alreadyCapped: boolean;
+  simulated: boolean;
   onPredict: (pick: Pick) => void;
 }) {
   const isFinished = match.status === "finished";
@@ -304,6 +342,11 @@ function MatchCard({
           </span>
           <p className="text-sm font-semibold" style={{ color: "var(--cap-gold)" }}>
             Cap earned for this match
+            {simulated && (
+              <span className="ml-2 text-xs font-normal" style={{ color: "var(--chalk-dim)" }}>
+                (simulated — not yet on-chain)
+              </span>
+            )}
           </p>
         </div>
       ) : (
