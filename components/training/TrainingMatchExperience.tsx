@@ -2,27 +2,23 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import type { Keypair } from "@solana/web3.js";
 
 import type { Match } from "@/lib/txline";
 import type { BoxScore } from "@/lib/trainingBoxScores";
-import {
-  ensureFunded,
-  submitPrediction,
-  submitPredictionWithKeypair,
-} from "@/lib/predictionMemo";
+import { ensureFunded, submitPrediction, submitPredictionWithKeypair } from "@/lib/predictionMemo";
 import { getOrCreateGuestKeypair } from "@/lib/guestWallet";
 import { addCap } from "@/lib/store";
 import {
   scoreTrainingPrediction,
-  type FoulsBand,
   type TrainingPrediction,
   type TrainingResult,
-  type YellowBand,
 } from "@/lib/trainingScoring";
 import { PitchDiagram } from "./PitchDiagram";
+import { ImmersiveBackground } from "./ImmersiveBackground";
 
 type Step = "briefing" | "predict" | "review" | "revealed";
 
@@ -30,8 +26,8 @@ const DEFAULT_PREDICTION: TrainingPrediction = {
   homeScore: 1,
   awayScore: 1,
   redCard: "none",
-  yellowBand: "0-2",
-  foulsBand: "0-15",
+  yellowCards: 3,
+  fouls: 18,
   penaltyAwarded: false,
   manOfTheMatch: "",
 };
@@ -40,15 +36,17 @@ function makeSimulatedSignature(): string {
   return `simulated-${Date.now().toString(36)}`;
 }
 
-export function TrainingMatchExperience({
-  match,
-  box,
-}: {
-  match: Match;
-  box: BoxScore;
-}) {
+const stepVariants = {
+  enter: { opacity: 0, y: 28 },
+  center: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -28 },
+};
+
+export function TrainingMatchExperience({ match, box }: { match: Match; box: BoxScore }) {
   const { connection } = useConnection();
   const wallet = useWallet();
+  const reduceMotion = useReducedMotion();
+
   const [guestKeypair, setGuestKeypair] = useState<Keypair | null>(null);
   const [guestStatus, setGuestStatus] = useState<"idle" | "funding">("idle");
 
@@ -121,218 +119,279 @@ export function TrainingMatchExperience({
     }
   }
 
+  const titleWords = `${match.homeTeam} vs ${match.awayTeam}`.split(" ");
+
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
-      <Link href="/" className="text-xs" style={{ color: "var(--floodlight)" }}>
-        ← Back to matches
-      </Link>
+    <div className="relative min-h-screen">
+      <ImmersiveBackground />
 
-      <header className="flex flex-col gap-1">
-        <span
-          className="scoreboard text-xs uppercase tracking-[0.2em]"
-          style={{ color: "var(--floodlight)" }}
-        >
-          {match.competition}
-        </span>
-        <h1 className="text-2xl font-bold" style={{ color: "var(--chalk)" }}>
-          {match.homeTeam} vs {match.awayTeam}
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-6 py-10 md:px-10 md:py-14">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="text-xs" style={{ color: "var(--floodlight)" }}>
+            ← Back to matches
+          </Link>
+          <span
+            className="scoreboard text-xs uppercase tracking-[0.2em]"
+            style={{ color: "var(--floodlight)" }}
+          >
+            {match.competition}
+          </span>
+        </div>
+
+        <h1 className="text-4xl font-black tracking-tight sm:text-5xl" style={{ color: "var(--chalk)" }}>
+          {titleWords.map((word, i) => (
+            <motion.span
+              key={`${word}-${i}`}
+              className="inline-block pr-[0.22em]"
+              initial={reduceMotion ? false : { opacity: 0, y: 18, filter: "blur(8px)" }}
+              animate={reduceMotion ? undefined : { opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.5, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {word}
+            </motion.span>
+          ))}
         </h1>
-      </header>
 
-      {step === "briefing" && (
-        <section className="flex flex-col gap-5">
-          <PitchDiagram
-            homeTeam={match.homeTeam}
-            awayTeam={match.awayTeam}
-            homeLoadout={match.homeLoadout ?? []}
-            awayLoadout={match.awayLoadout ?? []}
-          />
-          <div
-            className="rounded-lg border p-4"
-            style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            variants={stepVariants}
+            initial={reduceMotion ? undefined : "enter"}
+            animate="center"
+            exit={reduceMotion ? undefined : "exit"}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-1 flex-col gap-8 pb-16"
           >
-            <p
-              className="mb-2 text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--chalk-dim)" }}
-            >
-              Pre-match
-            </p>
-            <div className="flex flex-col gap-2 text-sm" style={{ color: "var(--chalk-dim)" }}>
-              {(match.preview ?? []).map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </div>
-          </div>
-          <button
-            onClick={() => setStep("predict")}
-            className="cursor-pointer self-start rounded-md px-5 py-3 text-sm font-bold transition-[filter] hover:brightness-110"
-            style={{ background: "var(--cap-gold)", color: "var(--night)" }}
-          >
-            I&apos;ve seen enough — make my calls
-          </button>
-        </section>
-      )}
-
-      {step === "predict" && (
-        <PredictionSheetForm
-          match={match}
-          value={prediction}
-          onChange={setPrediction}
-          onSubmit={() => setStep("review")}
-        />
-      )}
-
-      {step === "review" && (
-        <section className="flex flex-col gap-5">
-          <div
-            className="flex flex-col gap-3 rounded-lg border p-4"
-            style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
-          >
-            <p
-              className="text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--chalk-dim)" }}
-            >
-              Your prediction sheet
-            </p>
-            <ReviewLine label="Full-time score">
-              {match.homeTeam} {prediction.homeScore} – {prediction.awayScore} {match.awayTeam}
-            </ReviewLine>
-            <ReviewLine label="Red card">
-              {prediction.redCard === "none" ? "No red card" : `${prediction.redCard === "home" ? match.homeTeam : match.awayTeam} sent off`}
-            </ReviewLine>
-            <ReviewLine label="Yellow cards">{prediction.yellowBand}</ReviewLine>
-            <ReviewLine label="Total fouls">{prediction.foulsBand}</ReviewLine>
-            <ReviewLine label="Penalty awarded">{prediction.penaltyAwarded ? "Yes" : "No"}</ReviewLine>
-            <ReviewLine label="Man of the Match">{prediction.manOfTheMatch}</ReviewLine>
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <button
-              onClick={() => setStep("predict")}
-              className="cursor-pointer text-sm underline"
-              style={{ color: "var(--chalk-dim)" }}
-            >
-              Change my calls
-            </button>
-
-            <div className="flex items-center gap-3">
-              {!wallet.publicKey && !guestKeypair && (
-                <button
-                  onClick={handleTryGuest}
-                  disabled={guestStatus === "funding"}
-                  className="cursor-pointer rounded-md px-4 py-2.5 text-sm font-bold transition-[filter] hover:brightness-110 disabled:opacity-60"
+            {step === "briefing" && (
+              <section className="flex flex-col gap-6">
+                <PitchDiagram
+                  homeTeam={match.homeTeam}
+                  awayTeam={match.awayTeam}
+                  homeLoadout={match.homeLoadout ?? []}
+                  awayLoadout={match.awayLoadout ?? []}
+                />
+                <div
+                  className="rounded-xl border p-6"
+                  style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+                >
+                  <p
+                    className="mb-3 text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--chalk-dim)" }}
+                  >
+                    Pre-match
+                  </p>
+                  <div className="flex max-w-[68ch] flex-col gap-3 text-[15px] leading-relaxed" style={{ color: "var(--chalk-dim)" }}>
+                    {(match.preview ?? []).map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                  onClick={() => setStep("predict")}
+                  className="cursor-pointer self-start rounded-md px-6 py-3.5 text-base font-bold"
                   style={{ background: "var(--cap-gold)", color: "var(--night)" }}
                 >
-                  {guestStatus === "funding" ? "Preparing key…" : "Try instantly"}
-                </button>
-              )}
-              <WalletMultiButton />
-            </div>
-          </div>
-
-          {notice && (
-            <p
-              className="rounded-md px-4 py-2 text-sm"
-              style={{ background: "var(--cap-gold-dim)", color: "var(--cap-gold)" }}
-            >
-              {notice}
-            </p>
-          )}
-
-          <button
-            onClick={handleLockIn}
-            disabled={!effectiveKey || locking}
-            className="cursor-pointer self-start rounded-md px-5 py-3 text-sm font-bold transition-[filter] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ background: "var(--floodlight)", color: "var(--night)" }}
-          >
-            {locking ? "Locking in…" : "Lock in predictions"}
-          </button>
-        </section>
-      )}
-
-      {step === "revealed" && result && (
-        <section className="flex flex-col gap-5">
-          <div
-            className="rounded-lg border p-4"
-            style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
-          >
-            <p
-              className="mb-2 text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--chalk-dim)" }}
-            >
-              Full-time report
-            </p>
-            <p className="scoreboard mb-3 text-xl font-bold" style={{ color: "var(--chalk)" }}>
-              {match.homeTeam} {box.homeScore} – {box.awayScore} {match.awayTeam}
-            </p>
-            <div className="flex flex-col gap-2 text-sm" style={{ color: "var(--chalk-dim)" }}>
-              {box.report.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </div>
-          </div>
-
-          <div
-            className="rounded-lg border p-4"
-            style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
-          >
-            <p
-              className="mb-3 text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--chalk-dim)" }}
-            >
-              Your sheet, marked
-            </p>
-            <ul className="flex flex-col gap-2">
-              {result.lines.map((line) => (
-                <li key={line.label} className="flex items-center justify-between text-sm">
-                  <span style={{ color: "var(--chalk-dim)" }}>{line.label}</span>
-                  <span
-                    className="scoreboard font-semibold"
-                    style={{ color: line.correct ? "var(--pitch)" : "var(--chalk-faint)" }}
-                  >
-                    {line.correct ? `+${line.points}` : "0"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div
-              className="mt-3 flex items-center justify-between border-t pt-3"
-              style={{ borderColor: "var(--line)" }}
-            >
-              <span className="text-sm font-semibold" style={{ color: "var(--chalk)" }}>
-                Total
-              </span>
-              <span className="scoreboard text-xl font-bold" style={{ color: "var(--cap-gold)" }}>
-                {result.total} pts
-              </span>
-            </div>
-            {simulated && (
-              <p className="mt-2 text-xs" style={{ color: "var(--chalk-faint)" }}>
-                Simulated — not yet broadcast on-chain.
-              </p>
+                  I&apos;ve seen enough — make my calls
+                </motion.button>
+              </section>
             )}
-          </div>
 
-          <Link
-            href="/"
-            className="self-start rounded-md px-5 py-3 text-sm font-bold"
-            style={{ background: "var(--cap-gold)", color: "var(--night)" }}
-          >
-            Back to matches
-          </Link>
-        </section>
-      )}
+            {step === "predict" && (
+              <PredictionSheetForm
+                match={match}
+                value={prediction}
+                onChange={setPrediction}
+                onSubmit={() => setStep("review")}
+                reduceMotion={!!reduceMotion}
+              />
+            )}
+
+            {step === "review" && (
+              <section className="flex flex-col gap-6">
+                <div
+                  className="flex flex-col gap-3 rounded-xl border p-6"
+                  style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+                >
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--chalk-dim)" }}
+                  >
+                    Your prediction sheet
+                  </p>
+                  <ReviewLine label="Full-time score">
+                    {match.homeTeam} {prediction.homeScore} – {prediction.awayScore} {match.awayTeam}
+                  </ReviewLine>
+                  <ReviewLine label="Red card">
+                    {prediction.redCard === "none"
+                      ? "No red card"
+                      : `${prediction.redCard === "home" ? match.homeTeam : match.awayTeam} sent off`}
+                  </ReviewLine>
+                  <ReviewLine label="Yellow cards">{prediction.yellowCards}</ReviewLine>
+                  <ReviewLine label="Total fouls">{prediction.fouls}</ReviewLine>
+                  <ReviewLine label="Penalty awarded">{prediction.penaltyAwarded ? "Yes" : "No"}</ReviewLine>
+                  <ReviewLine label="Man of the Match">{prediction.manOfTheMatch}</ReviewLine>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <button
+                    onClick={() => setStep("predict")}
+                    className="cursor-pointer text-sm underline"
+                    style={{ color: "var(--chalk-dim)" }}
+                  >
+                    Change my calls
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    {!wallet.publicKey && !guestKeypair && (
+                      <button
+                        onClick={handleTryGuest}
+                        disabled={guestStatus === "funding"}
+                        className="cursor-pointer rounded-md px-4 py-2.5 text-sm font-bold transition-[filter] hover:brightness-110 disabled:opacity-60"
+                        style={{ background: "var(--cap-gold)", color: "var(--night)" }}
+                      >
+                        {guestStatus === "funding" ? "Preparing key…" : "Try instantly"}
+                      </button>
+                    )}
+                    <WalletMultiButton />
+                  </div>
+                </div>
+
+                {notice && (
+                  <p
+                    className="rounded-md px-4 py-2 text-sm"
+                    style={{ background: "var(--cap-gold-dim)", color: "var(--cap-gold)" }}
+                  >
+                    {notice}
+                  </p>
+                )}
+
+                <motion.button
+                  whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                  onClick={handleLockIn}
+                  disabled={!effectiveKey || locking}
+                  className="cursor-pointer self-start rounded-md px-6 py-3.5 text-base font-bold disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: "var(--floodlight)", color: "var(--night)" }}
+                >
+                  {locking ? "Locking in…" : "Lock in predictions"}
+                </motion.button>
+              </section>
+            )}
+
+            {step === "revealed" && result && (
+              <section className="flex flex-col gap-6">
+                <div
+                  className="rounded-xl border p-6"
+                  style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+                >
+                  <p
+                    className="mb-2 text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--chalk-dim)" }}
+                  >
+                    Full-time report
+                  </p>
+                  <p className="scoreboard mb-4 text-2xl font-bold" style={{ color: "var(--chalk)" }}>
+                    {match.homeTeam} {box.homeScore} – {box.awayScore} {match.awayTeam}
+                  </p>
+                  <div className="flex max-w-[68ch] flex-col gap-3 text-[15px] leading-relaxed" style={{ color: "var(--chalk-dim)" }}>
+                    {box.report.map((line, i) => (
+                      <motion.p
+                        key={line}
+                        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                        animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: i * 0.12 }}
+                      >
+                        {line}
+                      </motion.p>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-xl border p-6"
+                  style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+                >
+                  <p
+                    className="mb-3 text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--chalk-dim)" }}
+                  >
+                    Your sheet, marked
+                  </p>
+                  <ul className="flex flex-col gap-2">
+                    {result.lines.map((line, i) => (
+                      <motion.li
+                        key={line.label}
+                        initial={reduceMotion ? false : { opacity: 0, x: -12 }}
+                        animate={reduceMotion ? undefined : { opacity: 1, x: 0 }}
+                        transition={{ duration: 0.35, delay: 0.7 + i * 0.08 }}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span style={{ color: "var(--chalk-dim)" }}>
+                          {line.label}
+                          {line.detail && (
+                            <span className="ml-2 text-xs" style={{ color: "var(--chalk-faint)" }}>
+                              ({line.detail})
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className="scoreboard font-semibold"
+                          style={{ color: line.correct ? "var(--pitch)" : "var(--chalk-faint)" }}
+                        >
+                          {line.points > 0 ? `+${line.points}` : "0"}
+                        </span>
+                      </motion.li>
+                    ))}
+                  </ul>
+                  <div
+                    className="mt-3 flex items-center justify-between border-t pt-3"
+                    style={{ borderColor: "var(--line)" }}
+                  >
+                    <span className="text-sm font-semibold" style={{ color: "var(--chalk)" }}>
+                      Total
+                    </span>
+                    <motion.span
+                      initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                      animate={reduceMotion ? undefined : { scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 1.4, ease: [0.2, 1.4, 0.4, 1] }}
+                      className="scoreboard text-2xl font-bold"
+                      style={{ color: "var(--cap-gold)" }}
+                    >
+                      {result.total} pts
+                    </motion.span>
+                  </div>
+                  {simulated && (
+                    <p className="mt-2 text-xs" style={{ color: "var(--chalk-faint)" }}>
+                      Simulated — not yet broadcast on-chain.
+                    </p>
+                  )}
+                </div>
+
+                <Link
+                  href="/"
+                  className="self-start rounded-md px-6 py-3.5 text-base font-bold"
+                  style={{ background: "var(--cap-gold)", color: "var(--night)" }}
+                >
+                  Back to matches
+                </Link>
+              </section>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
+}
 
-  function ReviewLine({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-      <div className="flex items-center justify-between text-sm">
-        <span style={{ color: "var(--chalk-faint)" }}>{label}</span>
-        <span style={{ color: "var(--chalk)" }}>{children}</span>
-      </div>
-    );
-  }
+function ReviewLine({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span style={{ color: "var(--chalk-faint)" }}>{label}</span>
+      <span style={{ color: "var(--chalk)" }}>{children}</span>
+    </div>
+  );
 }
 
 function PredictionSheetForm({
@@ -340,32 +399,35 @@ function PredictionSheetForm({
   value,
   onChange,
   onSubmit,
+  reduceMotion,
 }: {
   match: Match;
   value: TrainingPrediction;
   onChange: (p: TrainingPrediction) => void;
   onSubmit: () => void;
+  reduceMotion: boolean;
 }) {
-  const players = [...(match.homeLoadout ?? []), ...(match.awayLoadout ?? [])];
   const canSubmit = value.manOfTheMatch !== "";
 
   return (
     <section
-      className="flex flex-col gap-6 rounded-lg border p-5"
+      className="flex flex-col gap-7 rounded-xl border p-6 md:p-8"
       style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
     >
       <Field label="Full-time score">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <NumberStepper
             value={value.homeScore}
             onChange={(n) => onChange({ ...value, homeScore: n })}
             label={match.homeTeam}
+            max={9}
           />
           <span style={{ color: "var(--chalk-faint)" }}>–</span>
           <NumberStepper
             value={value.awayScore}
             onChange={(n) => onChange({ ...value, awayScore: n })}
             label={match.awayTeam}
+            max={9}
           />
         </div>
       </Field>
@@ -383,18 +445,21 @@ function PredictionSheetForm({
       </Field>
 
       <Field label="Total yellow cards">
-        <ChoiceRow
-          options={(["0-2", "3-5", "6+"] as YellowBand[]).map((v) => ({ value: v, label: v }))}
-          selected={value.yellowBand}
-          onSelect={(v) => onChange({ ...value, yellowBand: v as YellowBand })}
+        <NumberStepper
+          value={value.yellowCards}
+          onChange={(n) => onChange({ ...value, yellowCards: n })}
+          label="pick any number"
+          max={12}
         />
       </Field>
 
       <Field label="Total fouls">
-        <ChoiceRow
-          options={(["0-15", "16-25", "26+"] as FoulsBand[]).map((v) => ({ value: v, label: v }))}
-          selected={value.foulsBand}
-          onSelect={(v) => onChange({ ...value, foulsBand: v as FoulsBand })}
+        <NumberStepper
+          value={value.fouls}
+          onChange={(n) => onChange({ ...value, fouls: n })}
+          label="pick any number"
+          max={45}
+          step={1}
         />
       </Field>
 
@@ -410,22 +475,42 @@ function PredictionSheetForm({
       </Field>
 
       <Field label="Man of the Match">
-        <ChoiceRow
-          options={players.map((p) => ({ value: p, label: p }))}
-          selected={value.manOfTheMatch}
-          onSelect={(v) => onChange({ ...value, manOfTheMatch: v })}
-          wrap
-        />
+        <select
+          value={value.manOfTheMatch}
+          onChange={(e) => onChange({ ...value, manOfTheMatch: e.target.value })}
+          className="rounded-md border px-3 py-2.5 text-sm"
+          style={{ background: "var(--night-3)", borderColor: "var(--line)", color: "var(--chalk)" }}
+        >
+          <option value="" disabled>
+            Choose a player…
+          </option>
+          <optgroup label={match.homeTeam}>
+            {(match.homeLoadout ?? []).map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label={match.awayTeam}>
+            {(match.awayLoadout ?? []).map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </optgroup>
+        </select>
       </Field>
 
-      <button
+      <motion.button
+        whileHover={reduceMotion || !canSubmit ? undefined : { scale: 1.03 }}
+        whileTap={reduceMotion || !canSubmit ? undefined : { scale: 0.97 }}
         onClick={onSubmit}
         disabled={!canSubmit}
-        className="cursor-pointer self-start rounded-md px-5 py-3 text-sm font-bold transition-[filter] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+        className="cursor-pointer self-start rounded-md px-6 py-3.5 text-base font-bold disabled:cursor-not-allowed disabled:opacity-40"
         style={{ background: "var(--floodlight)", color: "var(--night)" }}
       >
         Review my sheet
-      </button>
+      </motion.button>
     </section>
   );
 }
@@ -445,10 +530,14 @@ function NumberStepper({
   value,
   onChange,
   label,
+  max,
+  step = 1,
 }: {
   value: number;
   onChange: (n: number) => void;
   label: string;
+  max: number;
+  step?: number;
 }) {
   return (
     <div className="flex flex-col items-center gap-1">
@@ -457,18 +546,18 @@ function NumberStepper({
       </span>
       <div className="flex items-center gap-2">
         <button
-          onClick={() => onChange(Math.max(0, value - 1))}
-          className="h-8 w-8 cursor-pointer rounded-md border text-sm"
+          onClick={() => onChange(Math.max(0, value - step))}
+          className="h-9 w-9 cursor-pointer rounded-md border text-base"
           style={{ borderColor: "var(--line)", color: "var(--chalk)" }}
         >
           −
         </button>
-        <span className="scoreboard w-6 text-center text-lg font-bold" style={{ color: "var(--chalk)" }}>
+        <span className="scoreboard w-8 text-center text-lg font-bold" style={{ color: "var(--chalk)" }}>
           {value}
         </span>
         <button
-          onClick={() => onChange(Math.min(9, value + 1))}
-          className="h-8 w-8 cursor-pointer rounded-md border text-sm"
+          onClick={() => onChange(Math.min(max, value + step))}
+          className="h-9 w-9 cursor-pointer rounded-md border text-base"
           style={{ borderColor: "var(--line)", color: "var(--chalk)" }}
         >
           +
@@ -482,15 +571,13 @@ function ChoiceRow({
   options,
   selected,
   onSelect,
-  wrap,
 }: {
   options: { value: string; label: string }[];
   selected: string;
   onSelect: (v: string) => void;
-  wrap?: boolean;
 }) {
   return (
-    <div className={`flex gap-2 ${wrap ? "flex-wrap" : ""}`}>
+    <div className="flex flex-wrap gap-2">
       {options.map((opt) => {
         const isSelected = opt.value === selected;
         return (

@@ -1,14 +1,11 @@
 import type { BoxScore } from "./trainingBoxScores";
 
-export type YellowBand = "0-2" | "3-5" | "6+";
-export type FoulsBand = "0-15" | "16-25" | "26+";
-
 export type TrainingPrediction = {
   homeScore: number;
   awayScore: number;
   redCard: "home" | "away" | "none";
-  yellowBand: YellowBand;
-  foulsBand: FoulsBand;
+  yellowCards: number;
+  fouls: number;
   penaltyAwarded: boolean;
   manOfTheMatch: string;
 };
@@ -17,6 +14,7 @@ export type ScoreLine = {
   label: string;
   correct: boolean;
   points: number;
+  detail?: string;
 };
 
 export type TrainingResult = {
@@ -24,22 +22,19 @@ export type TrainingResult = {
   total: number;
 };
 
-export function yellowBandFor(count: number): YellowBand {
-  if (count <= 2) return "0-2";
-  if (count <= 5) return "3-5";
-  return "6+";
-}
-
-export function foulsBandFor(count: number): FoulsBand {
-  if (count <= 15) return "0-15";
-  if (count <= 25) return "16-25";
-  return "26+";
-}
-
 function outcomeOf(homeScore: number, awayScore: number): "home" | "draw" | "away" {
   if (homeScore > awayScore) return "home";
   if (homeScore < awayScore) return "away";
   return "draw";
+}
+
+// Free numeric guesses get tiered credit instead of an all-or-nothing band —
+// spot on scores full marks, close scores something for the effort.
+function tieredPoints(guess: number, actual: number, exact: number, within: number, tolerance: number) {
+  const diff = Math.abs(guess - actual);
+  if (diff === 0) return exact;
+  if (diff <= tolerance) return within;
+  return 0;
 }
 
 export function scoreTrainingPrediction(
@@ -67,18 +62,20 @@ export function scoreTrainingPrediction(
     points: pred.redCard === box.redCard ? 10 : 0,
   });
 
-  const actualYellowBand = yellowBandFor(box.yellowCards);
+  const yellowPts = tieredPoints(pred.yellowCards, box.yellowCards, 15, 8, 1);
   lines.push({
     label: "Yellow cards",
-    correct: pred.yellowBand === actualYellowBand,
-    points: pred.yellowBand === actualYellowBand ? 10 : 0,
+    correct: yellowPts > 0,
+    points: yellowPts,
+    detail: yellowPts === 15 ? "spot on" : yellowPts === 8 ? "within 1" : undefined,
   });
 
-  const actualFoulsBand = foulsBandFor(box.fouls);
+  const foulsPts = tieredPoints(pred.fouls, box.fouls, 15, 8, 3);
   lines.push({
     label: "Total fouls",
-    correct: pred.foulsBand === actualFoulsBand,
-    points: pred.foulsBand === actualFoulsBand ? 10 : 0,
+    correct: foulsPts > 0,
+    points: foulsPts,
+    detail: foulsPts === 15 ? "spot on" : foulsPts === 8 ? "within 3" : undefined,
   });
 
   lines.push({

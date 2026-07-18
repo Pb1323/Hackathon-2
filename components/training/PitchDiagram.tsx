@@ -1,14 +1,23 @@
-const HOME_POSITIONS = [
-  { x: 130, y: 90 },
-  { x: 170, y: 190 },
-  { x: 130, y: 290 },
-];
+"use client";
 
-const AWAY_POSITIONS = [
-  { x: 470, y: 90 },
-  { x: 430, y: 190 },
-  { x: 470, y: 290 },
+import { motion, useReducedMotion } from "framer-motion";
+
+// Positions assume loadout order: [GK, 4x DEF, 3x MID, 3x FWD] — a classic
+// 4-3-3, laid out left-to-right on a horizontal pitch.
+const HOME_POSITIONS = [
+  { x: 60, y: 300 },
+  { x: 150, y: 90 },
+  { x: 150, y: 230 },
+  { x: 150, y: 370 },
+  { x: 150, y: 510 },
+  { x: 300, y: 150 },
+  { x: 300, y: 300 },
+  { x: 300, y: 450 },
+  { x: 440, y: 150 },
+  { x: 440, y: 300 },
+  { x: 440, y: 450 },
 ];
+const AWAY_POSITIONS = HOME_POSITIONS.map((p) => ({ x: 1000 - p.x, y: p.y }));
 
 export function PitchDiagram({
   homeTeam,
@@ -21,63 +30,94 @@ export function PitchDiagram({
   homeLoadout: string[];
   awayLoadout: string[];
 }) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <svg
-      viewBox="0 0 600 380"
+      viewBox="0 0 1000 600"
       className="h-auto w-full"
       role="img"
-      aria-label={`Key players to watch: ${homeTeam} — ${homeLoadout.join(", ")}. ${awayTeam} — ${awayLoadout.join(", ")}.`}
+      aria-label={`Starting XI. ${homeTeam}: ${homeLoadout.join(", ")}. ${awayTeam}: ${awayLoadout.join(", ")}.`}
     >
-      <rect x="0" y="0" width="600" height="380" rx="8" fill="var(--night-3)" />
-      <g stroke="var(--pitch)" strokeWidth="2" fill="none" opacity="0.55">
-        <rect x="16" y="16" width="568" height="348" />
-        <line x1="300" y1="16" x2="300" y2="364" />
-        <circle cx="300" cy="190" r="48" />
-        <circle cx="300" cy="190" r="2.5" fill="var(--pitch)" />
-        <rect x="16" y="110" width="70" height="160" />
-        <rect x="514" y="110" width="70" height="160" />
-        <rect x="16" y="152" width="26" height="76" />
-        <rect x="558" y="152" width="26" height="76" />
+      <defs>
+        <radialGradient id="pitch-sheen" cx="50%" cy="35%" r="75%">
+          <stop offset="0%" stopColor="var(--night-3)" />
+          <stop offset="100%" stopColor="var(--night-2)" />
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="1000" height="600" rx="14" fill="url(#pitch-sheen)" />
+      <g stroke="var(--pitch)" strokeWidth="2.5" fill="none" opacity="0.55">
+        <rect x="24" y="24" width="952" height="552" />
+        <line x1="500" y1="24" x2="500" y2="576" />
+        <circle cx="500" cy="300" r="78" />
+        <circle cx="500" cy="300" r="3" fill="var(--pitch)" />
+        <rect x="24" y="180" width="120" height="240" />
+        <rect x="856" y="180" width="120" height="240" />
+        <rect x="24" y="250" width="44" height="100" />
+        <rect x="932" y="250" width="44" height="100" />
       </g>
 
       {HOME_POSITIONS.map((pos, i) => (
-        <g key={homeLoadout[i]}>
-          <circle cx={pos.x} cy={pos.y} r="10" fill="var(--floodlight)" />
-          <text
-            x={pos.x}
-            y={pos.y - 18}
-            textAnchor="middle"
-            fontSize="14"
-            fontWeight={600}
-            fill="var(--chalk)"
-          >
-            {homeLoadout[i]}
-          </text>
-        </g>
+        <PlayerMark
+          key={homeLoadout[i]}
+          pos={pos}
+          name={homeLoadout[i]}
+          color="var(--floodlight)"
+          delay={i * 0.04}
+          reduceMotion={!!reduceMotion}
+        />
       ))}
-
       {AWAY_POSITIONS.map((pos, i) => (
-        <g key={awayLoadout[i]}>
-          <circle cx={pos.x} cy={pos.y} r="10" fill="var(--cap-gold)" />
-          <text
-            x={pos.x}
-            y={pos.y - 18}
-            textAnchor="middle"
-            fontSize="14"
-            fontWeight={600}
-            fill="var(--chalk)"
-          >
-            {awayLoadout[i]}
-          </text>
-        </g>
+        <PlayerMark
+          key={awayLoadout[i]}
+          pos={pos}
+          name={awayLoadout[i]}
+          color="var(--cap-gold)"
+          delay={0.44 + i * 0.04}
+          reduceMotion={!!reduceMotion}
+        />
       ))}
 
-      <text x="20" y="374" fontSize="12" fill="var(--chalk-faint)">
+      <text x="30" y="596" fontSize="16" fontWeight={700} fill="var(--chalk-dim)">
         {homeTeam}
       </text>
-      <text x="580" y="374" textAnchor="end" fontSize="12" fill="var(--chalk-faint)">
+      <text x="970" y="596" textAnchor="end" fontSize="16" fontWeight={700} fill="var(--chalk-dim)">
         {awayTeam}
       </text>
     </svg>
+  );
+}
+
+function PlayerMark({
+  pos,
+  name,
+  color,
+  delay,
+  reduceMotion,
+}: {
+  pos: { x: number; y: number };
+  name: string;
+  color: string;
+  delay: number;
+  reduceMotion: boolean;
+}) {
+  return (
+    <motion.g
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.4 }}
+      animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <circle cx={pos.x} cy={pos.y} r="9" fill={color} />
+      <text
+        x={pos.x}
+        y={pos.y - 16}
+        textAnchor="middle"
+        fontSize="12.5"
+        fontWeight={600}
+        fill="var(--chalk)"
+      >
+        {name}
+      </text>
+    </motion.g>
   );
 }
