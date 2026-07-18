@@ -19,7 +19,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Modern wallet-adapter auto-detects installed wallets (Phantom, Solflare,
   // etc.) via the Wallet Standard — no explicit adapter list needed.
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider
+      endpoint={endpoint}
+      config={{ commitment: "confirmed", disableRetryOnRateLimit: true }}
+    >
       <WalletProvider wallets={[]} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
