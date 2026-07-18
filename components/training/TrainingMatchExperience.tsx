@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Tilt from "react-parallax-tilt";
+import confetti from "canvas-confetti";
+import { toast } from "sonner";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import type { Keypair } from "@solana/web3.js";
@@ -12,7 +14,8 @@ import type { Match } from "@/lib/txline";
 import type { BoxScore } from "@/lib/trainingBoxScores";
 import { ensureFunded, submitPrediction, submitPredictionWithKeypair } from "@/lib/predictionMemo";
 import { getOrCreateGuestKeypair } from "@/lib/guestWallet";
-import { addCap } from "@/lib/store";
+import { addCap, getCaps, totalPoints } from "@/lib/store";
+import { checkLevelUp } from "@/lib/levelUp";
 import {
   scoreTrainingPrediction,
   type TrainingPrediction,
@@ -165,6 +168,7 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
       }
 
       const scored = scoreTrainingPrediction(box, prediction);
+      const prevPoints = totalPoints(getCaps(effectiveKey));
       addCap(effectiveKey, {
         matchId: match.id,
         pick: `${prediction.homeScore}-${prediction.awayScore}`,
@@ -173,6 +177,17 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
         signature: wasSimulated ? makeSimulatedSignature() : "on-chain",
         simulated: wasSimulated,
       });
+
+      const leveledTo = checkLevelUp(prevPoints, prevPoints + scored.total);
+      if (leveledTo) {
+        confetti({
+          particleCount: 220,
+          spread: 100,
+          origin: { y: 0.5 },
+          colors: ["#d4af37", "#f5f0e6", "#ffffff", "#2f6b3a"],
+        });
+        toast.success(`🎉 Level up! Welcome to ${leveledTo}`, { duration: 5000 });
+      }
 
       setSimulated(wasSimulated);
       setResult(scored);

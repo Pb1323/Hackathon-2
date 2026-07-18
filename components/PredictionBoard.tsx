@@ -18,6 +18,7 @@ import {
   type PredictionPayload,
 } from "@/lib/predictionMemo";
 import { pointsForPick, type Pick } from "@/lib/scoring";
+import { checkLevelUp } from "@/lib/levelUp";
 import { getOrCreateGuestKeypair } from "@/lib/guestWallet";
 import {
   addCap,
@@ -114,6 +115,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
 
       if (match.status === "finished") {
         const { correct, points: earned } = pointsForPick(match, pick, streak);
+        const prevPoints = points;
         addCap(effectiveKey, {
           matchId: match.id,
           pick,
@@ -123,6 +125,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
           simulated,
         });
         setVersion((v) => v + 1);
+        const leveledTo = checkLevelUp(prevPoints, prevPoints + earned);
         if (correct) {
           confetti({
             particleCount: 120,
@@ -133,6 +136,15 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
           toast.success(`Correct pick! +${earned} points`);
         } else {
           toast("Not this time — no points from this pick");
+        }
+        if (leveledTo) {
+          confetti({
+            particleCount: 220,
+            spread: 100,
+            origin: { y: 0.5 },
+            colors: ["#d4af37", "#f5f0e6", "#ffffff", "#2f6b3a"],
+          });
+          toast.success(`🎉 Level up! Welcome to ${leveledTo}`, { duration: 5000 });
         }
       }
     } catch (err) {
@@ -224,27 +236,6 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
             .filter((m) => TRAINING_BOX_SCORES[m.id] && effectiveKey && hasCapForMatch(effectiveKey, m.id))
             .map((m) => m.id)}
         />
-      )}
-
-      {finished.some((m) => !TRAINING_BOX_SCORES[m.id]) && (
-        <Section
-          title="Quick drills — settle instantly"
-          note="Simulated form guide and results, for practicing calls any time"
-        >
-          {finished
-            .filter((m) => !TRAINING_BOX_SCORES[m.id])
-            .map((match) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                walletKey={effectiveKey}
-                pending={pending === match.id}
-                alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
-                simulated={caps.find((c) => c.matchId === match.id)?.simulated ?? false}
-                onPredict={(pick) => handlePredict(match, pick)}
-              />
-            ))}
-        </Section>
       )}
     </div>
   );
