@@ -3,10 +3,17 @@
 import { useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import type { Keypair } from "@solana/web3.js";
 
 import type { Match } from "@/lib/txline";
-import { submitPrediction, type PredictionPayload } from "@/lib/predictionMemo";
+import {
+  ensureFunded,
+  submitPrediction,
+  submitPredictionWithKeypair,
+  type PredictionPayload,
+} from "@/lib/predictionMemo";
 import { pointsForPick, type Pick } from "@/lib/scoring";
+import { getOrCreateGuestKeypair } from "@/lib/guestWallet";
 import {
   addCap,
   currentStreak,
@@ -21,16 +28,20 @@ import { Leaderboard } from "./Leaderboard";
 export function PredictionBoard({ matches }: { matches: Match[] }) {
   const { connection } = useConnection();
   const wallet = useWallet();
-  const walletKey = wallet.publicKey?.toBase58() ?? null;
 
+  const [guestKeypair, setGuestKeypair] = useState<Keypair | null>(null);
+  const [guestStatus, setGuestStatus] = useState<"idle" | "funding">("idle");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0); // bump to re-read localStorage
 
+  const effectiveKey =
+    wallet.publicKey?.toBase58() ?? guestKeypair?.publicKey.toBase58() ?? null;
+
   const caps: Cap[] = useMemo(
-    () => (walletKey ? getCaps(walletKey) : []),
+    () => (effectiveKey ? getCaps(effectiveKey) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [walletKey, version]
+    [effectiveKey, version]
   );
   const points = totalPoints(caps);
   const streak = currentStreak(caps);
@@ -38,8 +49,24 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
   const finished = matches.filter((m) => m.status === "finished");
   const upcoming = matches.filter((m) => m.status !== "finished");
 
+  async function handleTryGuest() {
+    setError(null);
+    setGuestStatus("funding");
+    try {
+      const kp = getOrCreateGuestKeypair();
+      await ensureFunded(connection, kp.publicKey);
+      setGuestKeypair(kp);
+    } catch {
+      setError(
+        "Devnet's faucet is rate-limited right now — wait a minute and try again, or connect Phantom instead."
+      );
+    } finally {
+      setGuestStatus("idle");
+    }
+  }
+
   async function handlePredict(match: Match, pick: Pick) {
-    if (!walletKey) return;
+    if (!effectiveKey) return;
     setError(null);
     setPending(match.id);
     try {
@@ -48,11 +75,13 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         pick,
         predictedAt: new Date().toISOString(),
       };
-      const signature = await submitPrediction(connection, wallet, payload);
+      const signature = guestKeypair
+        ? await submitPredictionWithKeypair(connection, guestKeypair, payload)
+        : await submitPrediction(connection, wallet, payload);
 
       if (match.status === "finished") {
         const { correct, points: earned } = pointsForPick(match, pick, streak);
-        addCap(walletKey, {
+        addCap(effectiveKey, {
           matchId: match.id,
           pick,
           correct,
@@ -68,8 +97,8 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
     }
   }
 
-  const you = walletKey
-    ? { label: `${walletKey.slice(0, 4)}…${walletKey.slice(-4)}`, points }
+  const you = effectiveKey
+    ? { label: `${effectiveKey.slice(0, 4)}…${effectiveKey.slice(-4)}`, points }
     : null;
 
   return (
@@ -78,15 +107,16 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-5"
         style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
       >
-        {walletKey ? (
+        {effectiveKey ? (
           <DivisionRing points={points} />
         ) : (
           <p className="text-sm" style={{ color: "var(--chalk-dim)" }}>
-            Connect a devnet wallet to start earning caps.
+            Connect Phantom, or try instantly with a disposable devnet key —
+            no installs needed.
           </p>
         )}
-        <div className="flex items-center gap-4">
-          {walletKey && (
+        <div className="flex items-center gap-3">
+          {effectiveKey && (
             <div className="text-right">
               <p className="scoreboard text-2xl font-bold" style={{ color: "var(--chalk)" }}>
                 {streak}
@@ -95,6 +125,16 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
                 Streak
               </p>
             </div>
+          )}
+          {!wallet.publicKey && !guestKeypair && (
+            <button
+              onClick={handleTryGuest}
+              disabled={guestStatus === "funding"}
+              className="rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60"
+              style={{ background: "var(--cap-gold)", color: "var(--turf)" }}
+            >
+              {guestStatus === "funding" ? "Funding devnet key…" : "Try instantly"}
+            </button>
           )}
           <WalletMultiButton />
         </div>
@@ -117,9 +157,9 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
             <MatchCard
               key={match.id}
               match={match}
-              walletKey={walletKey}
+              walletKey={effectiveKey}
               pending={pending === match.id}
-              alreadyCapped={walletKey ? hasCapForMatch(walletKey, match.id) : false}
+              alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
               onPredict={(pick) => handlePredict(match, pick)}
             />
           ))}
@@ -132,9 +172,9 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
             <MatchCard
               key={match.id}
               match={match}
-              walletKey={walletKey}
+              walletKey={effectiveKey}
               pending={pending === match.id}
-              alreadyCapped={walletKey ? hasCapForMatch(walletKey, match.id) : false}
+              alreadyCapped={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
               onPredict={(pick) => handlePredict(match, pick)}
             />
           ))}
@@ -238,13 +278,21 @@ function MatchCard({
               key={pick}
               disabled={!walletKey || pending}
               onClick={() => onPredict(pick)}
-              className="flex-1 rounded-md border px-3 py-2 text-sm font-medium capitalize transition-colors disabled:opacity-40"
-              style={{ borderColor: "var(--pitch-line)", color: "var(--chalk)" }}
+              className="flex-1 cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold capitalize transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                borderColor: "var(--pitch-line)",
+                color: "var(--chalk)",
+                background: "var(--turf-panel-2)",
+              }}
               onMouseEnter={(e) => {
-                if (!e.currentTarget.disabled) e.currentTarget.style.background = "var(--turf-panel-2)";
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.background = "var(--floodlight-dim)";
+                  e.currentTarget.style.borderColor = "var(--floodlight)";
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.background = "var(--turf-panel-2)";
+                e.currentTarget.style.borderColor = "var(--pitch-line)";
               }}
             >
               {pending ? "Signing…" : pick}

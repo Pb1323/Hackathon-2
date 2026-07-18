@@ -51,14 +51,28 @@ body {
   position: absolute;
   inset: -20%;
   background:
-    radial-gradient(ellipse 55% 70% at 18% 0%, var(--floodlight-dim), transparent 60%),
-    radial-gradient(ellipse 55% 70% at 82% 0%, var(--floodlight-dim), transparent 60%);
-  animation: floodlight-pulse 7s ease-in-out infinite;
+    conic-gradient(from 200deg at 12% -10%, transparent 0deg, oklch(0.87 0.14 95 / 0.55) 8deg, transparent 26deg),
+    conic-gradient(from 340deg at 88% -10%, transparent 0deg, oklch(0.87 0.14 95 / 0.55) 8deg, transparent 26deg),
+    radial-gradient(ellipse 50% 60% at 12% 0%, oklch(0.87 0.14 95 / 0.3), transparent 65%),
+    radial-gradient(ellipse 50% 60% at 88% 0%, oklch(0.87 0.14 95 / 0.3), transparent 65%);
+  animation: floodlight-pulse 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.floodlight-field::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: min(70%, 640px);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, var(--pitch-line) 20%, var(--pitch-line) 80%, transparent);
   pointer-events: none;
 }
 
 @keyframes floodlight-pulse {
-  0%, 100% { opacity: 0.7; }
+  0%, 100% { opacity: 0.75; }
   50% { opacity: 1; }
 }
 

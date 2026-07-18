@@ -5,6 +5,8 @@
 
 import {
   Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -56,4 +58,45 @@ export async function submitPrediction(
   );
 
   return signature;
+}
+
+// Same anchoring, but signed by a local disposable keypair instead of a
+// wallet extension — used by the guest/no-install testing flow.
+export async function submitPredictionWithKeypair(
+  connection: Connection,
+  payer: Keypair,
+  payload: PredictionPayload
+): Promise<string> {
+  const instruction = buildMemoInstruction(payload, payer.publicKey);
+  const transaction = new Transaction().add(instruction);
+
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = payer.publicKey;
+  transaction.sign(payer);
+
+  const signature = await connection.sendRawTransaction(transaction.serialize());
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    "confirmed"
+  );
+
+  return signature;
+}
+
+export async function ensureFunded(
+  connection: Connection,
+  publicKey: PublicKey,
+  minLamports = 0.02 * LAMPORTS_PER_SOL
+): Promise<void> {
+  const balance = await connection.getBalance(publicKey);
+  if (balance >= minLamports) return;
+
+  const signature = await connection.requestAirdrop(publicKey, LAMPORTS_PER_SOL);
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    "confirmed"
+  );
 }
