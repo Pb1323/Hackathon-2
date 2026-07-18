@@ -33,6 +33,28 @@ const MOCK_MATCHES: Match[] = [
     status: "scheduled",
     odds: { home: 2.1, draw: 3.4, away: 2.9 },
   },
+  {
+    id: "wc-semi-1",
+    competition: "World Cup Semi-Final",
+    homeTeam: "Team C",
+    awayTeam: "Team D",
+    kickoffISO: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    status: "finished",
+    homeScore: 1,
+    awayScore: 2,
+    odds: { home: 1.9, draw: 3.6, away: 3.8 },
+  },
+  {
+    id: "wc-semi-2",
+    competition: "World Cup Semi-Final",
+    homeTeam: "Team E",
+    awayTeam: "Team F",
+    kickoffISO: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    status: "finished",
+    homeScore: 2,
+    awayScore: 2,
+    odds: { home: 2.4, draw: 3.1, away: 2.8 },
+  },
 ];
 
 export async function getUpcomingMatches(): Promise<Match[]> {
