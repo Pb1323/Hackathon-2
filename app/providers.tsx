@@ -7,6 +7,7 @@ import {
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { clusterApiUrl } from "@solana/web3.js";
+import { Toaster } from "sonner";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -24,7 +25,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       config={{ commitment: "confirmed", disableRetryOnRateLimit: true }}
     >
       <WalletProvider wallets={[]} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <WalletModalProvider>
+          {children}
+          <Toaster theme="dark" position="bottom-right" richColors />
+        </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

@@ -22,6 +22,7 @@ import { getCommunityPredictions } from "@/lib/communityPredictions";
 import { PitchDiagram } from "./PitchDiagram";
 import { ImmersiveBackground } from "./ImmersiveBackground";
 import { CommunityScorecard } from "./CommunityScorecard";
+import { TrainingTicker } from "./TrainingTicker";
 
 type Step = "briefing" | "predict" | "review" | "revealed";
 
@@ -182,6 +183,8 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
           </span>
         </div>
 
+        <TrainingTicker match={match} />
+
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl" style={{ color: "var(--chalk)" }}>
           {titleWords.map((word, i) => (
             <motion.span
@@ -263,14 +266,14 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
             {step === "review" && (
               <section className="flex flex-col gap-6">
                 <div
-                  className="flex flex-col gap-3 rounded-xl border p-6"
-                  style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
+                  className="flex flex-col gap-3 rounded-xl border-2 p-6"
+                  style={{ background: "var(--night-2)", borderColor: "var(--floodlight)" }}
                 >
                   <p
-                    className="text-xs font-semibold uppercase tracking-widest"
-                    style={{ color: "var(--chalk-dim)" }}
+                    className="scoreboard text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--floodlight)" }}
                   >
-                    Your prediction sheet
+                    Order ticket
                   </p>
                   <ReviewLine label="Full-time score">
                     {match.homeTeam} {prediction.homeScore} – {prediction.awayScore} {match.awayTeam}
@@ -296,7 +299,7 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
                     className="cursor-pointer text-sm underline"
                     style={{ color: "var(--chalk-dim)" }}
                   >
-                    Change my calls
+                    Edit order
                   </button>
 
                   <div className="flex items-center gap-3">
@@ -331,7 +334,7 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
                   className="cursor-pointer self-start rounded-md px-6 py-3.5 text-base font-bold disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: "var(--floodlight)", color: "var(--night)" }}
                 >
-                  {locking ? "Locking in…" : "Lock in predictions"}
+                  {locking ? "Placing order…" : "Place order"}
                 </motion.button>
               </section>
             )}
@@ -472,6 +475,9 @@ function PredictionSheetForm({
       className="flex flex-col gap-7 rounded-xl border p-6 md:p-8"
       style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
     >
+      <p className="scoreboard text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--floodlight)" }}>
+        Build your order
+      </p>
       <Field label="Full-time score">
         <div className="flex items-center gap-4">
           <NumberStepper

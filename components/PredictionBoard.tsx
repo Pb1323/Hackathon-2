@@ -1,14 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import type { Keypair } from "@solana/web3.js";
+import confetti from "canvas-confetti";
+import { toast } from "sonner";
 
 import type { Match } from "@/lib/txline";
 import { impliedWinPct } from "@/lib/trainingMatches";
 import { TRAINING_BOX_SCORES } from "@/lib/trainingBoxScores";
+import { TrainingPath } from "./training/TrainingPath";
 import {
   ensureFunded,
   submitPrediction,
@@ -41,7 +43,6 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
   const [guestKeypair, setGuestKeypair] = useState<Keypair | null>(null);
   const [guestStatus, setGuestStatus] = useState<"idle" | "funding">("idle");
   const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [version, setVersion] = useState(0); // bump to re-read localStorage
 
@@ -60,7 +61,6 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
   const upcoming = matches.filter((m) => m.status !== "finished");
 
   async function handleTryGuest() {
-    setError(null);
     setNotice(null);
     setGuestStatus("funding");
     const kp = getOrCreateGuestKeypair();
@@ -80,8 +80,8 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
 
   async function handlePredict(match: Match, pick: Pick) {
     if (!effectiveKey) return;
-    setError(null);
     setPending(match.id);
+    const toastId = toast.loading("Signing transaction…");
     try {
       const payload: PredictionPayload = {
         matchId: match.id,
@@ -95,12 +95,18 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         signature = guestKeypair
           ? await submitPredictionWithKeypair(connection, guestKeypair, payload)
           : await submitPrediction(connection, wallet, payload);
+        toast.success("Prediction locked in — anchored on-chain before kickoff", {
+          id: toastId,
+        });
       } catch {
         // No devnet SOL to pay the transaction fee anywhere at hand — fall
         // back to a local, honestly-labeled simulated record instead of
         // blocking testing entirely.
         simulated = true;
         signature = makeSimulatedSignature();
+        toast.warning("No devnet SOL right now — recorded locally as simulated", {
+          id: toastId,
+        });
         setNotice(
           "No devnet SOL to broadcast this on-chain right now — recorded locally as simulated instead."
         );
@@ -117,9 +123,23 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
           simulated,
         });
         setVersion((v) => v + 1);
+        if (correct) {
+          confetti({
+            particleCount: 120,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ["#d4af37", "#f5f0e6", "#ffffff"],
+          });
+          toast.success(`Correct pick! +${earned} points`);
+        } else {
+          toast("Not this time — no points from this pick");
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit prediction");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to submit prediction",
+        { id: toastId }
+      );
     } finally {
       setPending(null);
     }
@@ -168,15 +188,6 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         </div>
       </div>
 
-      {error && (
-        <p
-          className="rounded-md px-4 py-2 text-sm"
-          style={{ background: "var(--live-dim)", color: "var(--live)" }}
-        >
-          {error}
-        </p>
-      )}
-
       {notice && (
         <p
           className="rounded-md px-4 py-2 text-sm"
@@ -204,15 +215,26 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         </Section>
       )}
 
-      {finished.length > 0 && (
+      {finished.map((match) =>
+        TRAINING_BOX_SCORES[match.id] ? (
+          <TrainingPath
+            key={match.id}
+            match={match}
+            points={points}
+            streak={streak}
+            done={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
+          />
+        ) : null
+      )}
+
+      {finished.some((m) => !TRAINING_BOX_SCORES[m.id]) && (
         <Section
-          title="Training mode — settle instantly"
+          title="Quick drills — settle instantly"
           note="Simulated form guide and results, for practicing calls any time"
         >
-          {finished.map((match) =>
-            TRAINING_BOX_SCORES[match.id] ? (
-              <TrainingModeCard key={match.id} match={match} />
-            ) : (
+          {finished
+            .filter((m) => !TRAINING_BOX_SCORES[m.id])
+            .map((match) => (
               <MatchCard
                 key={match.id}
                 match={match}
@@ -222,42 +244,10 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
                 simulated={caps.find((c) => c.matchId === match.id)?.simulated ?? false}
                 onPredict={(pick) => handlePredict(match, pick)}
               />
-            )
-          )}
+            ))}
         </Section>
       )}
     </div>
-  );
-}
-
-function TrainingModeCard({ match }: { match: Match }) {
-  const winPct = impliedWinPct(match);
-  return (
-    <Link
-      href={`/training/${match.id}`}
-      className="block rounded-lg border p-4 transition-colors hover:border-[var(--floodlight)]"
-      style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
-    >
-      <p className="text-xs uppercase tracking-widest" style={{ color: "var(--chalk-dim)" }}>
-        {match.competition}
-      </p>
-      <p className="text-lg font-medium" style={{ color: "var(--chalk)" }}>
-        {match.homeTeam} vs {match.awayTeam}
-      </p>
-      {match.homeLoadout && match.awayLoadout && (
-        <p className="mt-1 text-xs" style={{ color: "var(--chalk-faint)" }}>
-          {match.homeLoadout.join(", ")} · {match.awayLoadout.join(", ")}
-        </p>
-      )}
-      {winPct && (
-        <p className="scoreboard mt-2 text-xs" style={{ color: "var(--chalk-faint)" }}>
-          Win% — {match.homeTeam} {winPct.home}% · Draw {winPct.draw}% · {match.awayTeam} {winPct.away}%
-        </p>
-      )}
-      <p className="mt-3 text-sm font-semibold" style={{ color: "var(--floodlight)" }}>
-        Open full training mode →
-      </p>
-    </Link>
   );
 }
 
