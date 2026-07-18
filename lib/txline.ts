@@ -17,7 +17,13 @@ export type Match = {
     draw: number;
     away: number;
   };
+  // Key-player loadout for training-mode matches — simulated form guide, not
+  // a real squad list from TxLINE.
+  homeLoadout?: string[];
+  awayLoadout?: string[];
 };
+
+import { TRAINING_MATCHES } from "./trainingMatches";
 
 const TXLINE_BASE_URL = process.env.TXLINE_BASE_URL ?? "https://api.txline.example";
 const TXLINE_API_KEY = process.env.TXLINE_API_KEY;
@@ -33,33 +39,11 @@ const MOCK_MATCHES: Match[] = [
     status: "scheduled",
     odds: { home: 2.1, draw: 3.4, away: 2.9 },
   },
-  {
-    id: "wc-semi-1",
-    competition: "World Cup Semi-Final",
-    homeTeam: "Team C",
-    awayTeam: "Team D",
-    kickoffISO: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    status: "finished",
-    homeScore: 1,
-    awayScore: 2,
-    odds: { home: 1.9, draw: 3.6, away: 3.8 },
-  },
-  {
-    id: "wc-semi-2",
-    competition: "World Cup Semi-Final",
-    homeTeam: "Team E",
-    awayTeam: "Team F",
-    kickoffISO: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    status: "finished",
-    homeScore: 2,
-    awayScore: 2,
-    odds: { home: 2.4, draw: 3.1, away: 2.8 },
-  },
 ];
 
 export async function getUpcomingMatches(): Promise<Match[]> {
   if (!TXLINE_API_KEY) {
-    return MOCK_MATCHES;
+    return [...MOCK_MATCHES, ...TRAINING_MATCHES];
   }
 
   const res = await fetch(`${TXLINE_BASE_URL}/matches?status=scheduled`, {
@@ -77,7 +61,7 @@ export async function getUpcomingMatches(): Promise<Match[]> {
 
 export async function getMatchResult(matchId: string): Promise<Match> {
   if (!TXLINE_API_KEY) {
-    const match = MOCK_MATCHES.find((m) => m.id === matchId);
+    const match = [...MOCK_MATCHES, ...TRAINING_MATCHES].find((m) => m.id === matchId);
     if (!match) throw new Error(`Unknown mock match: ${matchId}`);
     return match;
   }

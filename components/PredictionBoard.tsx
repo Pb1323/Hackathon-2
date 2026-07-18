@@ -6,6 +6,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import type { Keypair } from "@solana/web3.js";
 
 import type { Match } from "@/lib/txline";
+import { impliedWinPct } from "@/lib/trainingMatches";
 import {
   ensureFunded,
   submitPrediction,
@@ -202,7 +203,10 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
       )}
 
       {finished.length > 0 && (
-        <Section title="Practice matches — settle instantly" note="Demo data, for trying the scoring engine now">
+        <Section
+          title="Training mode — settle instantly"
+          note="Simulated form guide and results, for practicing calls any time"
+        >
           {finished.map((match) => (
             <MatchCard
               key={match.id}
@@ -315,6 +319,31 @@ function MatchCard({
           })}
         </p>
       </div>
+
+      {match.homeLoadout && match.awayLoadout && (
+        <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <p style={{ color: "var(--chalk-faint)" }}>{match.homeTeam} loadout</p>
+            <p style={{ color: "var(--chalk-dim)" }}>{match.homeLoadout.join(", ")}</p>
+          </div>
+          <div className="text-right">
+            <p style={{ color: "var(--chalk-faint)" }}>{match.awayTeam} loadout</p>
+            <p style={{ color: "var(--chalk-dim)" }}>{match.awayLoadout.join(", ")}</p>
+          </div>
+        </div>
+      )}
+
+      {(() => {
+        const winPct = impliedWinPct(match);
+        if (!winPct) return null;
+        return (
+          <div className="scoreboard mt-2 flex gap-3 text-xs" style={{ color: "var(--chalk-faint)" }}>
+            <span>Win% — {match.homeTeam} {winPct.home}%</span>
+            <span>Draw {winPct.draw}%</span>
+            <span>{match.awayTeam} {winPct.away}%</span>
+          </div>
+        );
+      })()}
 
       {alreadyCapped ? (
         <div className="mt-4 flex items-center gap-2.5">
