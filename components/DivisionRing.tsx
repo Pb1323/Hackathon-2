@@ -8,6 +8,14 @@ const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const TICKS = 12;
 
+// Math.cos/sin can differ in their last bit between server (Node) and
+// client (browser) JS engines, which is enough to fail hydration when
+// rendered as raw attribute values — round to a fixed precision so both
+// sides always produce the exact same string.
+function round(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
 export function DivisionRing({ points }: { points: number }) {
   const division = divisionForPoints(points);
   const index = DIVISIONS.findIndex((d) => d.name === division.name);
@@ -39,10 +47,10 @@ export function DivisionRing({ points }: { points: number }) {
             return (
               <line
                 key={i}
-                x1={cx + rOuter * Math.cos(angle)}
-                y1={cy + rOuter * Math.sin(angle)}
-                x2={cx + rInner * Math.cos(angle)}
-                y2={cy + rInner * Math.sin(angle)}
+                x1={round(cx + rOuter * Math.cos(angle))}
+                y1={round(cy + rOuter * Math.sin(angle))}
+                x2={round(cx + rInner * Math.cos(angle))}
+                y2={round(cy + rInner * Math.sin(angle))}
               />
             );
           })}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Tilt from "react-parallax-tilt";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -19,6 +19,7 @@ import {
   type TrainingResult,
 } from "@/lib/trainingScoring";
 import { getCommunityPredictions } from "@/lib/communityPredictions";
+import { nextInQueue, queuePosition } from "@/lib/trainingQueue";
 import { PitchDiagram } from "./PitchDiagram";
 import { ImmersiveBackground } from "./ImmersiveBackground";
 import { CommunityScorecard } from "./CommunityScorecard";
@@ -99,6 +100,24 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
   const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<TrainingResult | null>(null);
   const [simulated, setSimulated] = useState(false);
+  const [queueInfo, setQueueInfo] = useState<{
+    nextId: string | null;
+    position: { position: number; total: number } | null;
+  } | null>(null);
+
+  // Read the session queue only after mount — sessionStorage isn't
+  // available during SSR, and reading it inline would crash the server
+  // render entirely rather than just mismatch.
+  useEffect(() => {
+    // One-time read of sessionStorage after mount, not a subscription —
+    // there's nothing to subscribe to, so the effect-based read is correct
+    // here despite the lint rule's general preference against it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setQueueInfo({ nextId: nextInQueue(match.id), position: queuePosition(match.id) });
+  }, [match.id]);
+
+  const nextQueuedId = queueInfo?.nextId ?? null;
+  const queuePos = queueInfo?.position ?? null;
 
   const effectiveKey =
     wallet.publicKey?.toBase58() ?? guestKeypair?.publicKey.toBase58() ?? null;
@@ -430,13 +449,30 @@ export function TrainingMatchExperience({ match, box }: { match: Match; box: Box
                   )}
                 </div>
 
-                <Link
-                  href="/"
-                  className="self-start rounded-md px-6 py-3.5 text-base font-bold"
-                  style={{ background: "var(--cap-gold)", color: "var(--night)" }}
-                >
-                  Back to matches
-                </Link>
+                <div className="flex flex-wrap items-center gap-4">
+                  {nextQueuedId ? (
+                    <Link
+                      href={`/training/${nextQueuedId}`}
+                      className="rounded-md px-6 py-3.5 text-base font-bold"
+                      style={{ background: "var(--floodlight)", color: "var(--night)" }}
+                    >
+                      Next match in your session →
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/"
+                      className="rounded-md px-6 py-3.5 text-base font-bold"
+                      style={{ background: "var(--cap-gold)", color: "var(--night)" }}
+                    >
+                      Back to matches
+                    </Link>
+                  )}
+                  {queuePos && (
+                    <span className="scoreboard text-xs" style={{ color: "var(--chalk-faint)" }}>
+                      Match {queuePos.position} of {queuePos.total} in this session
+                    </span>
+                  )}
+                </div>
               </section>
             )}
           </motion.div>

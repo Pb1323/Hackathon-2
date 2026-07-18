@@ -215,16 +215,15 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
         </Section>
       )}
 
-      {finished.map((match) =>
-        TRAINING_BOX_SCORES[match.id] ? (
-          <TrainingPath
-            key={match.id}
-            match={match}
-            points={points}
-            streak={streak}
-            done={effectiveKey ? hasCapForMatch(effectiveKey, match.id) : false}
-          />
-        ) : null
+      {finished.some((m) => TRAINING_BOX_SCORES[m.id]) && (
+        <TrainingPath
+          matches={finished.filter((m) => TRAINING_BOX_SCORES[m.id])}
+          points={points}
+          streak={streak}
+          doneIds={finished
+            .filter((m) => TRAINING_BOX_SCORES[m.id] && effectiveKey && hasCapForMatch(effectiveKey, m.id))
+            .map((m) => m.id)}
+        />
       )}
 
       {finished.some((m) => !TRAINING_BOX_SCORES[m.id]) && (

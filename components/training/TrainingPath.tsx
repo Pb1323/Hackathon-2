@@ -1,9 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 
 import type { Match } from "@/lib/txline";
+import { impliedWinPct } from "@/lib/trainingMatches";
+import { setQueue } from "@/lib/trainingQueue";
 import { DivisionRing } from "../DivisionRing";
 
 function initials(team: string): string {
@@ -16,33 +19,46 @@ function initials(team: string): string {
 }
 
 export function TrainingPath({
-  match,
+  matches,
   points,
   streak,
-  done,
+  doneIds,
 }: {
-  match: Match;
+  matches: Match[];
   points: number;
   streak: number;
-  done: boolean;
+  doneIds: string[];
 }) {
+  const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const [selected, setSelected] = useState<string[]>(matches.map((m) => m.id));
+
+  function toggle(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleStart() {
+    if (selected.length === 0) return;
+    const ordered = matches.map((m) => m.id).filter((id) => selected.includes(id));
+    setQueue(ordered);
+    router.push(`/training/${ordered[0]}`);
+  }
 
   return (
     <div
-      className="flex flex-col gap-6 rounded-xl border p-6"
+      className="flex flex-col gap-5 rounded-xl border p-6"
       style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p
-            className="text-xs font-semibold uppercase tracking-widest"
-            style={{ color: "var(--chalk-dim)" }}
+            className="scoreboard text-xs font-semibold uppercase tracking-widest"
+            style={{ color: "var(--floodlight)" }}
           >
-            Your training progress
+            Training dashboard
           </p>
           <p className="mt-1 text-sm" style={{ color: "var(--chalk-faint)" }}>
-            Every full training session earns real points, on a real path.
+            Pick the matches for this session, then work through them one by one.
           </p>
         </div>
         <div className="flex items-center gap-6">
@@ -58,68 +74,64 @@ export function TrainingPath({
         </div>
       </div>
 
-      <div className="relative flex flex-col items-center gap-3 py-4">
-        <svg
-          className="pointer-events-none absolute left-1/2 top-0 h-full w-2 -translate-x-1/2"
-          viewBox="0 0 8 200"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <line
-            x1="4"
-            y1="0"
-            x2="4"
-            y2="200"
-            stroke="var(--line)"
-            strokeWidth="3"
-            strokeDasharray="2 10"
-            strokeLinecap="round"
-          />
-        </svg>
+      <ul className="flex flex-col gap-2">
+        {matches.map((match) => {
+          const winPct = impliedWinPct(match);
+          const isDone = doneIds.includes(match.id);
+          const isSelected = selected.includes(match.id);
+          return (
+            <motion.li
+              key={match.id}
+              initial={false}
+              animate={{ borderColor: isSelected ? "var(--floodlight)" : "var(--line)" }}
+              className="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
+              style={{ background: "var(--night-3)" }}
+              onClick={() => toggle(match.id)}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggle(match.id)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ accentColor: "var(--floodlight)" }}
+                className="h-4 w-4 shrink-0"
+              />
+              <div
+                className="scoreboard flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                style={{ background: "var(--floodlight-dim)", color: "var(--floodlight)" }}
+              >
+                {initials(match.homeTeam)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold" style={{ color: "var(--chalk)" }}>
+                  {match.homeTeam} vs {match.awayTeam}
+                </p>
+                {winPct && (
+                  <p className="scoreboard text-xs" style={{ color: "var(--chalk-faint)" }}>
+                    {winPct.home}% / {winPct.draw}% / {winPct.away}%
+                  </p>
+                )}
+              </div>
+              {isDone && (
+                <span className="scoreboard text-xs font-bold" style={{ color: "var(--cap-gold)" }}>
+                  ✓ done
+                </span>
+              )}
+            </motion.li>
+          );
+        })}
+      </ul>
 
-        <Link href={`/training/${match.id}`} className="relative z-10">
-          <motion.div
-            whileHover={reduceMotion ? undefined : { scale: 1.06 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
-            className="flex h-24 w-24 flex-col items-center justify-center rounded-full border-4 text-center"
-            style={{
-              background: done ? "var(--cap-gold)" : "var(--floodlight)",
-              borderColor: "var(--night-3)",
-              color: "var(--night)",
-              boxShadow: done
-                ? "0 0 0 6px var(--cap-gold-dim)"
-                : "0 0 0 6px var(--floodlight-dim)",
-            }}
-          >
-            {done ? (
-              <span className="text-2xl">✓</span>
-            ) : (
-              <>
-                <span className="scoreboard text-xs font-bold">{initials(match.homeTeam)}</span>
-                <span className="text-[10px] font-bold">vs</span>
-                <span className="scoreboard text-xs font-bold">{initials(match.awayTeam)}</span>
-              </>
-            )}
-          </motion.div>
-        </Link>
-
-        <div className="relative z-10 text-center">
-          <p className="text-sm font-semibold" style={{ color: "var(--chalk)" }}>
-            {match.homeTeam} vs {match.awayTeam}
-          </p>
-          <p className="text-xs" style={{ color: "var(--chalk-faint)" }}>
-            {done ? "Completed — replay any time" : "Full training session · pitch, briefing, order ticket"}
-          </p>
-        </div>
-
-        <Link
-          href={`/training/${match.id}`}
-          className="relative z-10 rounded-md px-6 py-2.5 text-sm font-bold"
-          style={{ background: "var(--cap-gold)", color: "var(--night)" }}
-        >
-          {done ? "Train again" : "Start"}
-        </Link>
-      </div>
+      <motion.button
+        whileHover={reduceMotion || selected.length === 0 ? undefined : { scale: 1.02 }}
+        whileTap={reduceMotion || selected.length === 0 ? undefined : { scale: 0.98 }}
+        onClick={handleStart}
+        disabled={selected.length === 0}
+        className="cursor-pointer self-start rounded-md px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
+        style={{ background: "var(--cap-gold)", color: "var(--night)" }}
+      >
+        Start session ({selected.length})
+      </motion.button>
     </div>
   );
 }
