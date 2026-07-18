@@ -1,20 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --turf: oklch(0.16 0.03 155);
-  --turf-panel: oklch(0.21 0.035 155);
-  --turf-panel-2: oklch(0.25 0.035 155);
-  --pitch-line: oklch(0.34 0.025 155);
-  --chalk: oklch(0.95 0.01 95);
-  --chalk-dim: oklch(0.7 0.02 130);
-  --floodlight: oklch(0.87 0.14 95);
-  --floodlight-dim: oklch(0.87 0.14 95 / 0.14);
-  --cap-gold: oklch(0.74 0.14 68);
-  --cap-gold-dim: oklch(0.74 0.14 68 / 0.16);
-  --live: oklch(0.62 0.19 25);
-  --live-dim: oklch(0.62 0.19 25 / 0.18);
+  /* Base: near-black stadium-at-night, not turf green */
+  --night: oklch(0.145 0.015 260);
+  --night-2: oklch(0.19 0.018 260);
+  --night-3: oklch(0.245 0.02 260);
+  --line: oklch(0.32 0.02 260);
+  --line-soft: oklch(0.27 0.02 260);
 
-  --background: var(--turf);
+  --chalk: oklch(0.96 0.01 95);
+  --chalk-dim: oklch(0.68 0.015 260);
+  --chalk-faint: oklch(0.48 0.012 260);
+
+  /* Pitch green — used sparingly: division ring, capped state, pitch motif */
+  --pitch: oklch(0.6 0.11 155);
+  --pitch-dim: oklch(0.6 0.11 155 / 0.16);
+
+  /* Floodlight — primary warm accent: buttons, focus, links */
+  --floodlight: oklch(0.88 0.15 95);
+  --floodlight-dim: oklch(0.88 0.15 95 / 0.14);
+
+  --cap-gold: oklch(0.78 0.16 70);
+  --cap-gold-dim: oklch(0.78 0.16 70 / 0.16);
+
+  --live: oklch(0.65 0.2 25);
+  --live-dim: oklch(0.65 0.2 25 / 0.18);
+
+  --background: var(--night);
   --foreground: var(--chalk);
 }
 
@@ -23,10 +35,24 @@
   --color-foreground: var(--foreground);
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Consolas, monospace;
+
+  --animate-flood-sweep: flood-sweep 9s ease-in-out infinite;
+  --animate-live-ping: live-ping 1.8s ease-out infinite;
+  --animate-cap-in: cap-in 650ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  --animate-cap-shine: cap-shine 1.4s ease-out 1;
+  --animate-cap-glow: cap-glow 2.4s ease-in-out infinite;
 }
 
 * {
-  border-color: var(--pitch-line);
+  border-color: var(--line);
+}
+
+a {
+  color: var(--floodlight);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--cap-gold);
 }
 
 body {
@@ -41,46 +67,9 @@ body {
   letter-spacing: 0.02em;
 }
 
-.floodlight-field {
-  position: relative;
-  overflow: hidden;
-}
-
-.floodlight-field::before {
-  content: "";
-  position: absolute;
-  inset: -20%;
-  background:
-    conic-gradient(from 200deg at 12% -10%, transparent 0deg, oklch(0.87 0.14 95 / 0.55) 8deg, transparent 26deg),
-    conic-gradient(from 340deg at 88% -10%, transparent 0deg, oklch(0.87 0.14 95 / 0.55) 8deg, transparent 26deg),
-    radial-gradient(ellipse 50% 60% at 12% 0%, oklch(0.87 0.14 95 / 0.3), transparent 65%),
-    radial-gradient(ellipse 50% 60% at 88% 0%, oklch(0.87 0.14 95 / 0.3), transparent 65%);
-  animation: floodlight-pulse 6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.floodlight-field::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -1px;
-  width: min(70%, 640px);
-  height: 1px;
-  transform: translateX(-50%);
-  background: linear-gradient(90deg, transparent, var(--pitch-line) 20%, var(--pitch-line) 80%, transparent);
-  pointer-events: none;
-}
-
-@keyframes floodlight-pulse {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .floodlight-field::before {
-    animation: none;
-    opacity: 0.85;
-  }
+@keyframes flood-sweep {
+  0%, 100% { transform: translateX(-6%) rotate(0deg); opacity: 0.5; }
+  50% { transform: translateX(6%) rotate(0.6deg); opacity: 0.85; }
 }
 
 .live-dot {
@@ -99,40 +88,65 @@ body {
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .live-dot { animation: none; }
-}
-
 .ring-progress {
-  transition: stroke-dashoffset 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: stroke-dashoffset 650ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cap-in {
+  0% { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  55% { transform: scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes cap-shine {
+  0% { transform: translateX(-120%) rotate(20deg); }
+  100% { transform: translateX(220%) rotate(20deg); }
+}
+
+@keyframes cap-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.15); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ring-progress { transition: none; }
+  .live-dot,
+  .ring-progress,
+  [class*="animate-"] {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .wallet-adapter-button {
   background: var(--floodlight) !important;
-  color: var(--turf) !important;
+  color: var(--night) !important;
   font-family: var(--font-sans) !important;
-  font-weight: 600 !important;
-  border-radius: 6px !important;
-  height: 40px !important;
-  transition: background 150ms ease-out !important;
+  font-weight: 700 !important;
+  border-radius: 7px !important;
+  height: 42px !important;
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.3) inset, 0 4px 14px oklch(0.88 0.15 95 / 0.2) !important;
+  transition: background 150ms ease-out, transform 100ms ease-out, box-shadow 150ms ease-out !important;
 }
 
 .wallet-adapter-button:not([disabled]):hover {
   background: var(--cap-gold) !important;
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.3) inset, 0 6px 18px oklch(0.78 0.16 70 / 0.3) !important;
+}
+
+.wallet-adapter-button:not([disabled]):active {
+  transform: scale(0.97);
 }
 
 .wallet-adapter-button[disabled] {
-  background: var(--turf-panel-2) !important;
-  color: var(--chalk-dim) !important;
+  background: var(--night-3) !important;
+  color: var(--chalk-faint) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
 }
 
 .wallet-adapter-modal-wrapper {
-  background: var(--turf-panel) !important;
-  border: 1px solid var(--pitch-line);
+  background: var(--night-2) !important;
+  border: 1px solid var(--line);
 }
 
 .wallet-adapter-modal-title,

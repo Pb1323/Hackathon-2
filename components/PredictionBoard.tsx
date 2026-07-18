@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import type { Keypair } from "@solana/web3.js";
@@ -105,7 +105,7 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
     <div className="flex flex-col gap-8">
       <div
         className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-5"
-        style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
+        style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
       >
         {effectiveKey ? (
           <DivisionRing points={points} />
@@ -130,8 +130,8 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
             <button
               onClick={handleTryGuest}
               disabled={guestStatus === "funding"}
-              className="rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60"
-              style={{ background: "var(--cap-gold)", color: "var(--turf)" }}
+              className="cursor-pointer rounded-md px-4 py-2.5 text-sm font-bold shadow-[0_1px_0_oklch(1_0_0/0.3)_inset,0_4px_14px_oklch(0.78_0.16_70/0.25)] transition-[background,transform,box-shadow] duration-150 hover:brightness-110 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+              style={{ background: "var(--cap-gold)", color: "var(--night)" }}
             >
               {guestStatus === "funding" ? "Funding devnet key…" : "Try instantly"}
             </button>
@@ -231,10 +231,24 @@ function MatchCard({
 }) {
   const isFinished = match.status === "finished";
 
+  // Track the moment a cap is first earned so the badge plays its reveal once,
+  // then settles into a static "Cap earned" state on future renders.
+  const [justCapped, setJustCapped] = useState(false);
+  const wasCapped = useRef(alreadyCapped);
+  useEffect(() => {
+    if (alreadyCapped && !wasCapped.current) {
+      setJustCapped(true);
+      const t = setTimeout(() => setJustCapped(false), 1600);
+      wasCapped.current = true;
+      return () => clearTimeout(t);
+    }
+    wasCapped.current = alreadyCapped;
+  }, [alreadyCapped]);
+
   return (
     <div
-      className="rounded-lg border p-4"
-      style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
+      className="rounded-lg border p-4 transition-colors"
+      style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
     >
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -265,12 +279,33 @@ function MatchCard({
       </div>
 
       {alreadyCapped ? (
-        <p
-          className="mt-4 flex items-center gap-2 text-sm font-medium"
-          style={{ color: "var(--cap-gold)" }}
-        >
-          Cap earned for this match
-        </p>
+        <div className="mt-4 flex items-center gap-2.5">
+          <span className={`relative h-8 w-8 shrink-0 ${justCapped ? "motion-safe:animate-cap-in" : ""}`}>
+            {justCapped && (
+              <span
+                className="motion-safe:animate-cap-glow absolute -inset-2 rounded-full"
+                style={{ background: "radial-gradient(circle, var(--cap-gold-dim), transparent 70%)" }}
+                aria-hidden
+              />
+            )}
+            <svg width="32" height="32" viewBox="0 0 32 32" className="relative">
+              <circle cx="16" cy="16" r="14" fill="var(--night-3)" stroke="var(--cap-gold)" strokeWidth="2" />
+              <circle cx="16" cy="16" r="8" fill="none" stroke="var(--cap-gold)" strokeWidth="1.5" />
+              <polygon points="11,27 16,22 21,27 16,30" fill="var(--cap-gold)" />
+            </svg>
+            {justCapped && (
+              <span className="absolute inset-0 overflow-hidden rounded-full" aria-hidden>
+                <span
+                  className="motion-safe:animate-cap-shine absolute -top-2 left-0 h-[140%] w-2"
+                  style={{ background: "linear-gradient(oklch(1 0 0 / 0), oklch(1 0 0 / 0.8), oklch(1 0 0 / 0))" }}
+                />
+              </span>
+            )}
+          </span>
+          <p className="text-sm font-semibold" style={{ color: "var(--cap-gold)" }}>
+            Cap earned for this match
+          </p>
+        </div>
       ) : (
         <div className="mt-4 flex gap-2">
           {(["home", "draw", "away"] as const).map((pick) => (
@@ -278,21 +313,11 @@ function MatchCard({
               key={pick}
               disabled={!walletKey || pending}
               onClick={() => onPredict(pick)}
-              className="flex-1 cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold capitalize transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex-1 cursor-pointer rounded-md border px-3 py-2.5 text-sm font-semibold capitalize shadow-[0_1px_0_oklch(1_0_0/0.04)_inset] transition-[background,border-color,transform,box-shadow] duration-150 hover:enabled:border-[var(--floodlight)] hover:enabled:bg-[var(--floodlight-dim)] hover:enabled:shadow-[0_0_0_3px_var(--floodlight-dim)] active:enabled:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
               style={{
-                borderColor: "var(--pitch-line)",
+                borderColor: "var(--line)",
                 color: "var(--chalk)",
-                background: "var(--turf-panel-2)",
-              }}
-              onMouseEnter={(e) => {
-                if (!e.currentTarget.disabled) {
-                  e.currentTarget.style.background = "var(--floodlight-dim)";
-                  e.currentTarget.style.borderColor = "var(--floodlight)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--turf-panel-2)";
-                e.currentTarget.style.borderColor = "var(--pitch-line)";
+                background: "var(--night-3)",
               }}
             >
               {pending ? "Signing…" : pick}

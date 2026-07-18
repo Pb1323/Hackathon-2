@@ -14,9 +14,9 @@ export function Leaderboard({
   return (
     <div
       className="rounded-lg border"
-      style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
+      style={{ background: "var(--night-2)", borderColor: "var(--line)" }}
     >
-      <div className="border-b px-4 py-3" style={{ borderColor: "var(--pitch-line)" }}>
+      <div className="border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
         <h2
           className="text-xs font-semibold uppercase tracking-widest"
           style={{ color: "var(--chalk-dim)" }}
@@ -30,19 +30,20 @@ export function Leaderboard({
       <ol className="flex flex-col">
         {rows.map((row, i) => {
           const isYou = you && row.label === you.label;
+          const isTop3 = i < 3;
           return (
             <li
               key={row.label + i}
               className="flex items-center justify-between px-4 py-2.5 text-sm"
               style={{
-                borderTop: i > 0 ? "1px solid var(--pitch-line)" : undefined,
+                borderTop: i > 0 ? "1px solid var(--line-soft)" : undefined,
                 background: isYou ? "var(--cap-gold-dim)" : undefined,
               }}
             >
               <span className="flex items-center gap-3">
                 <span
                   className="scoreboard w-6 text-xs"
-                  style={{ color: i < 3 ? "var(--cap-gold)" : "var(--chalk-dim)" }}
+                  style={{ color: isTop3 ? "var(--cap-gold)" : "var(--chalk-faint)" }}
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -55,7 +56,7 @@ export function Leaderboard({
                   )}
                 </span>
               </span>
-              <span className="scoreboard" style={{ color: "var(--chalk)" }}>
+              <span className="scoreboard" style={{ color: isYou ? "var(--cap-gold)" : "var(--chalk)" }}>
                 {row.points} pts
               </span>
             </li>
