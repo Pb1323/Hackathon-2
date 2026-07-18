@@ -17,6 +17,9 @@ export function Leaderboard({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Cap leaderboard
         </h2>
+        <p className="mt-1 text-xs text-neutral-400">
+          Placeholder rivals shown below until more real players connect a wallet.
+        </p>
       </div>
       <ol className="divide-y divide-neutral-100 dark:divide-neutral-900">
         {rows.map((row, i) => (

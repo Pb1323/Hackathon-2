@@ -174,7 +174,13 @@ function MatchCard({
           </p>
         </div>
         <p className="text-xs text-neutral-500">
-          {new Date(match.kickoffISO).toLocaleString()}
+          {new Date(match.kickoffISO).toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </p>
       </div>
 
