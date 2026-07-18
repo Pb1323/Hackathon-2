@@ -12,31 +12,55 @@ export function Leaderboard({
   rows.sort((a, b) => b.points - a.points);
 
   return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800">
-      <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+    <div
+      className="rounded-lg border"
+      style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
+    >
+      <div className="border-b px-4 py-3" style={{ borderColor: "var(--pitch-line)" }}>
+        <h2
+          className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: "var(--chalk-dim)" }}
+        >
           Cap leaderboard
         </h2>
-        <p className="mt-1 text-xs text-neutral-400">
+        <p className="mt-1 text-xs" style={{ color: "var(--chalk-dim)" }}>
           Placeholder rivals shown below until more real players connect a wallet.
         </p>
       </div>
-      <ol className="divide-y divide-neutral-100 dark:divide-neutral-900">
-        {rows.map((row, i) => (
-          <li
-            key={row.label + i}
-            className={`flex items-center justify-between px-4 py-2 text-sm ${
-              you && row.label === you.label
-                ? "bg-amber-50 font-semibold dark:bg-amber-950/30"
-                : ""
-            }`}
-          >
-            <span>
-              #{i + 1} {row.label}
-            </span>
-            <span>{row.points} pts</span>
-          </li>
-        ))}
+      <ol className="flex flex-col">
+        {rows.map((row, i) => {
+          const isYou = you && row.label === you.label;
+          return (
+            <li
+              key={row.label + i}
+              className="flex items-center justify-between px-4 py-2.5 text-sm"
+              style={{
+                borderTop: i > 0 ? "1px solid var(--pitch-line)" : undefined,
+                background: isYou ? "var(--cap-gold-dim)" : undefined,
+              }}
+            >
+              <span className="flex items-center gap-3">
+                <span
+                  className="scoreboard w-6 text-xs"
+                  style={{ color: i < 3 ? "var(--cap-gold)" : "var(--chalk-dim)" }}
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span style={{ color: "var(--chalk)", fontWeight: isYou ? 600 : 400 }}>
+                  {row.label}
+                  {isYou && (
+                    <span className="ml-2 text-xs" style={{ color: "var(--cap-gold)" }}>
+                      you
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="scoreboard" style={{ color: "var(--chalk)" }}>
+                {row.points} pts
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

@@ -1,26 +1,127 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --turf: oklch(0.16 0.03 155);
+  --turf-panel: oklch(0.21 0.035 155);
+  --turf-panel-2: oklch(0.25 0.035 155);
+  --pitch-line: oklch(0.34 0.025 155);
+  --chalk: oklch(0.95 0.01 95);
+  --chalk-dim: oklch(0.7 0.02 130);
+  --floodlight: oklch(0.87 0.14 95);
+  --floodlight-dim: oklch(0.87 0.14 95 / 0.14);
+  --cap-gold: oklch(0.74 0.14 68);
+  --cap-gold-dim: oklch(0.74 0.14 68 / 0.16);
+  --live: oklch(0.62 0.19 25);
+  --live-dim: oklch(0.62 0.19 25 / 0.18);
+
+  --background: var(--turf);
+  --foreground: var(--chalk);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--pitch-line);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.scoreboard {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.floodlight-field {
+  position: relative;
+  overflow: hidden;
+}
+
+.floodlight-field::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(ellipse 55% 70% at 18% 0%, var(--floodlight-dim), transparent 60%),
+    radial-gradient(ellipse 55% 70% at 82% 0%, var(--floodlight-dim), transparent 60%);
+  animation: floodlight-pulse 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes floodlight-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floodlight-field::before {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 0 var(--live-dim);
+  animation: live-ping 1.8s ease-out infinite;
+}
+
+@keyframes live-ping {
+  0% { box-shadow: 0 0 0 0 var(--live-dim); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
+
+.ring-progress {
+  transition: stroke-dashoffset 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-progress { transition: none; }
+}
+
+.wallet-adapter-button {
+  background: var(--floodlight) !important;
+  color: var(--turf) !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  height: 40px !important;
+  transition: background 150ms ease-out !important;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background: var(--cap-gold) !important;
+}
+
+.wallet-adapter-button[disabled] {
+  background: var(--turf-panel-2) !important;
+  color: var(--chalk-dim) !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: var(--turf-panel) !important;
+  border: 1px solid var(--pitch-line);
+}
+
+.wallet-adapter-modal-title,
+.wallet-adapter-modal-list-more {
+  color: var(--chalk) !important;
 }

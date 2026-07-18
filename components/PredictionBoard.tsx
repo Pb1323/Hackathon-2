@@ -6,7 +6,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 import type { Match } from "@/lib/txline";
 import { submitPrediction, type PredictionPayload } from "@/lib/predictionMemo";
-import { divisionForPoints, pointsForPick, type Pick } from "@/lib/scoring";
+import { pointsForPick, type Pick } from "@/lib/scoring";
 import {
   addCap,
   currentStreak,
@@ -15,6 +15,7 @@ import {
   totalPoints,
   type Cap,
 } from "@/lib/store";
+import { DivisionRing } from "./DivisionRing";
 import { Leaderboard } from "./Leaderboard";
 
 export function PredictionBoard({ matches }: { matches: Match[] }) {
@@ -33,7 +34,6 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
   );
   const points = totalPoints(caps);
   const streak = currentStreak(caps);
-  const division = divisionForPoints(points);
 
   const finished = matches.filter((m) => m.status === "finished");
   const upcoming = matches.filter((m) => m.status !== "finished");
@@ -73,60 +73,46 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
     : null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-neutral-500">
-          {wallet.publicKey ? "Wallet connected" : "Connect a devnet wallet to earn caps"}
-        </span>
-        <WalletMultiButton />
+    <div className="flex flex-col gap-8">
+      <div
+        className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-5"
+        style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
+      >
+        {walletKey ? (
+          <DivisionRing points={points} />
+        ) : (
+          <p className="text-sm" style={{ color: "var(--chalk-dim)" }}>
+            Connect a devnet wallet to start earning caps.
+          </p>
+        )}
+        <div className="flex items-center gap-4">
+          {walletKey && (
+            <div className="text-right">
+              <p className="scoreboard text-2xl font-bold" style={{ color: "var(--chalk)" }}>
+                {streak}
+              </p>
+              <p className="text-xs uppercase tracking-widest" style={{ color: "var(--chalk-dim)" }}>
+                Streak
+              </p>
+            </div>
+          )}
+          <WalletMultiButton />
+        </div>
       </div>
 
-      {walletKey && (
-        <div className="grid grid-cols-3 gap-3 rounded-lg border border-neutral-200 p-4 text-center dark:border-neutral-800">
-          <div>
-            <p className="text-2xl font-semibold">{points}</p>
-            <p className="text-xs uppercase tracking-wide text-neutral-500">Points</p>
-          </div>
-          <div>
-            <p className="text-2xl font-semibold">{streak}</p>
-            <p className="text-xs uppercase tracking-wide text-neutral-500">Streak</p>
-          </div>
-          <div>
-            <p className="text-lg font-semibold">{division.name}</p>
-            <p className="text-xs uppercase tracking-wide text-neutral-500">Division</p>
-          </div>
-        </div>
-      )}
-
       {error && (
-        <p className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>
+        <p
+          className="rounded-md px-4 py-2 text-sm"
+          style={{ background: "var(--live-dim)", color: "var(--live)" }}
+        >
+          {error}
+        </p>
       )}
 
       <Leaderboard you={you} />
 
-      {finished.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Full-time — earn a cap
-          </h2>
-          {finished.map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              walletKey={walletKey}
-              pending={pending === match.id}
-              alreadyCapped={walletKey ? hasCapForMatch(walletKey, match.id) : false}
-              onPredict={(pick) => handlePredict(match, pick)}
-            />
-          ))}
-        </section>
-      )}
-
       {upcoming.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Upcoming
-          </h2>
+        <Section title="Call it before kickoff" live>
           {upcoming.map((match) => (
             <MatchCard
               key={match.id}
@@ -137,9 +123,56 @@ export function PredictionBoard({ matches }: { matches: Match[] }) {
               onPredict={(pick) => handlePredict(match, pick)}
             />
           ))}
-        </section>
+        </Section>
+      )}
+
+      {finished.length > 0 && (
+        <Section title="Practice matches — settle instantly" note="Demo data, for trying the scoring engine now">
+          {finished.map((match) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              walletKey={walletKey}
+              pending={pending === match.id}
+              alreadyCapped={walletKey ? hasCapForMatch(walletKey, match.id) : false}
+              onPredict={(pick) => handlePredict(match, pick)}
+            />
+          ))}
+        </Section>
       )}
     </div>
+  );
+}
+
+function Section({
+  title,
+  note,
+  live,
+  children,
+}: {
+  title: string;
+  note?: string;
+  live?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        {live && <span className="live-dot" aria-hidden />}
+        <h2
+          className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: "var(--chalk-dim)" }}
+        >
+          {title}
+        </h2>
+      </div>
+      {note && (
+        <p className="-mt-2 text-xs" style={{ color: "var(--chalk-dim)" }}>
+          {note}
+        </p>
+      )}
+      <div className="flex flex-col gap-3">{children}</div>
+    </section>
   );
 }
 
@@ -157,23 +190,30 @@ function MatchCard({
   onPredict: (pick: Pick) => void;
 }) {
   const isFinished = match.status === "finished";
+
   return (
-    <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <div className="flex items-center justify-between">
+    <div
+      className="rounded-lg border p-4"
+      style={{ background: "var(--turf-panel)", borderColor: "var(--pitch-line)" }}
+    >
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-neutral-500">
+          <p
+            className="text-xs uppercase tracking-widest"
+            style={{ color: "var(--chalk-dim)" }}
+          >
             {match.competition}
           </p>
-          <p className="text-lg font-medium">
+          <p className="text-lg font-medium" style={{ color: "var(--chalk)" }}>
             {match.homeTeam} vs {match.awayTeam}
             {isFinished && (
-              <span className="ml-2 text-neutral-500">
-                ({match.homeScore}–{match.awayScore})
+              <span className="scoreboard ml-2" style={{ color: "var(--cap-gold)" }}>
+                {match.homeScore}–{match.awayScore}
               </span>
             )}
           </p>
         </div>
-        <p className="text-xs text-neutral-500">
+        <p className="scoreboard text-xs" style={{ color: "var(--chalk-dim)" }}>
           {new Date(match.kickoffISO).toLocaleString("en-GB", {
             day: "2-digit",
             month: "2-digit",
@@ -185,7 +225,12 @@ function MatchCard({
       </div>
 
       {alreadyCapped ? (
-        <p className="mt-4 text-sm text-emerald-600">Cap earned for this match.</p>
+        <p
+          className="mt-4 flex items-center gap-2 text-sm font-medium"
+          style={{ color: "var(--cap-gold)" }}
+        >
+          Cap earned for this match
+        </p>
       ) : (
         <div className="mt-4 flex gap-2">
           {(["home", "draw", "away"] as const).map((pick) => (
@@ -193,11 +238,20 @@ function MatchCard({
               key={pick}
               disabled={!walletKey || pending}
               onClick={() => onPredict(pick)}
-              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium capitalize transition-colors hover:bg-neutral-100 disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-900"
+              className="flex-1 rounded-md border px-3 py-2 text-sm font-medium capitalize transition-colors disabled:opacity-40"
+              style={{ borderColor: "var(--pitch-line)", color: "var(--chalk)" }}
+              onMouseEnter={(e) => {
+                if (!e.currentTarget.disabled) e.currentTarget.style.background = "var(--turf-panel-2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
             >
-              {pick}
-              {match.odds && (
-                <span className="ml-1 text-neutral-500">{match.odds[pick]}</span>
+              {pending ? "Signing…" : pick}
+              {match.odds && !pending && (
+                <span className="scoreboard ml-1" style={{ color: "var(--chalk-dim)" }}>
+                  {match.odds[pick]}
+                </span>
               )}
             </button>
           ))}
